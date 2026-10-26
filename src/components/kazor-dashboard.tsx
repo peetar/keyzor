@@ -672,7 +672,10 @@ export function KazorDashboard({
                     </span>
                     <span className="text-slate-300">{act.details}</span>
                   </div>
-                  <span className="text-[11px] font-mono text-slate-500 shrink-0">
+                  <span
+                    className="text-[11px] font-mono text-slate-500 shrink-0"
+                    suppressHydrationWarning
+                  >
                     {new Date(act.createdAt).toLocaleString()}
                   </span>
                 </div>
