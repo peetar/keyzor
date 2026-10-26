@@ -423,10 +423,11 @@ export function KeyzorDashboard({
                   /{currentProject.slug}
                 </span>
               </div>
-              <p className="text-sm text-slate-500 mt-1">
-                {currentProject.description ||
-                  "Tracking feature lifecycle across CPO brainstorming, design.md handoff, prototype demo, test deploy, and production."}
-              </p>
+              {currentProject.description && (
+                <p className="text-sm text-slate-500 mt-1">
+                  {currentProject.description}
+                </p>
+              )}
             </div>
 
             {/* Display Preference Toggle: Flowchart vs Gantt vs Split */}
@@ -483,16 +484,13 @@ export function KeyzorDashboard({
         {/* At-A-Glance 4 Core Questions Summary Matrix */}
         {currentProject && currentProject.features.length > 0 && (
           <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
-            <div className="px-5 py-3.5 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between">
+            <div className="px-5 py-3 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-indigo-600" />
                 <h2 className="text-xs font-mono uppercase tracking-wider text-slate-800 font-bold">
-                  Executive Overview — The 4 Core Questions Across All Features
+                  Executive Overview
                 </h2>
               </div>
-              <span className="text-[11px] text-slate-500 font-medium">
-                Click any row or stage below to update status or attach links
-              </span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-sm">
@@ -613,10 +611,10 @@ export function KeyzorDashboard({
               {/* Visualization Area: Flowchart and/or Gantt */}
               {(viewMode === "flowchart" || viewMode === "both") && (
                 <div className="border-b border-slate-200/80">
-                  <div className="px-5 pt-3.5 pb-1 flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-500 font-medium">
-                    <span>Interactive Stage Flowchart (Click any stage to update)</span>
+                  <div className="px-5 pt-3 pb-1 flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-500 font-medium">
+                    <span>Stage Flowchart</span>
                     <span className="text-indigo-600 font-semibold">
-                      {feature.fourQuestions.where.percentComplete}% Lifecycle Complete
+                      {feature.fourQuestions.where.percentComplete}% Complete
                     </span>
                   </div>
                   <FeatureFlowchartView
@@ -628,9 +626,8 @@ export function KeyzorDashboard({
 
               {(viewMode === "gantt" || viewMode === "both") && (
                 <div>
-                  <div className="px-5 pt-3.5 pb-1 flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-500 font-medium">
-                    <span>Gantt Schedule &amp; Milestone Timeline</span>
-                    <span>Target vs. Expected Date Tracking</span>
+                  <div className="px-5 pt-3 pb-1 flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-500 font-medium">
+                    <span>Gantt Timeline</span>
                   </div>
                   <FeatureGanttView
                     feature={feature}

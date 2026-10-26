@@ -550,18 +550,13 @@ export function FeatureGanttView({
 
       {/* Stage Instructions & Proactive Agent Trigger Footer */}
       {!readOnly && (
-        <div className="mt-3 px-4 py-2.5 rounded-lg bg-indigo-50/70 border border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-700">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
-            <span>
-              <strong className="text-indigo-950 font-semibold">Proactive Agent Skill Trigger:</strong>{" "}
-              {feature.stages.find((s) => s.id === feature.currentStageId)
-                ?.proactiveTrigger ||
-                "Agent will ask 'Would you like to update the KEYZOR flowchart?' when the current milestone finishes."}
-            </span>
-          </div>
-          <span className="text-[11px] font-mono text-indigo-700/80 shrink-0 font-medium">
-            Click any bar to edit dates or attach links
+        <div className="mt-3 px-4 py-2 rounded-lg bg-indigo-50/70 border border-indigo-100 flex items-center gap-2 text-xs text-slate-700">
+          <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
+          <span>
+            <strong className="text-indigo-950 font-semibold">Proactive Agent Trigger:</strong>{" "}
+            {feature.stages.find((s) => s.id === feature.currentStageId)
+              ?.proactiveTrigger ||
+              "Agent will ask 'Would you like to update the KEYZOR flowchart?' when the current milestone finishes."}
           </span>
         </div>
       )}

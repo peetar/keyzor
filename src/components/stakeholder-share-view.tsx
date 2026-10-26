@@ -94,7 +94,7 @@ export function StakeholderShareView({
         <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
           <div className="px-5 py-3.5 bg-purple-50/70 border-b border-purple-100 flex items-center justify-between">
             <h2 className="text-xs font-mono uppercase tracking-wider text-purple-900 font-bold">
-              Executive Status Summary — Where, Who &amp; Expected Delivery
+              Executive Summary
             </h2>
             <span className="inline-flex items-center gap-1 text-[11px] text-purple-700 font-mono font-medium">
               <Lock className="w-3 h-3 text-purple-600" /> Verified Encrypted Share Link
