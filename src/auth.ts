@@ -54,6 +54,7 @@ providers.push(
 );
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  trustHost: true,
   secret:
     process.env.AUTH_SECRET ||
     "kazor-dev-secret-key-change-in-production-32bytes",
