@@ -951,10 +951,9 @@ export function KeyzorDashboard({
               </button>
             </div>
 
-            <div className="space-y-3 text-xs text-slate-600 leading-relaxed">
+            <div className="space-y-4 text-xs text-slate-600 leading-relaxed">
               <p>
-                Copy the prompt below and send it to your coding agent (Antigravity, Claude Code, Cursor, etc.). The agent will call{" "}
-                <code className="text-indigo-600 font-mono font-semibold">{origin}/hello</code>, build its own local{" "}
+                Connect your AI coding agent (Antigravity, Claude Code, Cursor, etc.) to KEYZOR. The agent will fetch your workspace schema, build its local{" "}
                 <code className="text-emerald-700 font-mono font-semibold">SKILL.md</code>, and proactively ask{" "}
                 <strong className="text-slate-900">
                   &ldquo;Would you like to update the KEYZOR flowchart?&rdquo;
@@ -962,54 +961,87 @@ export function KeyzorDashboard({
                 whenever you brainstorm a feature, finish a <code className="font-mono">design.md</code>, demo a prototype, or open a PR.
               </p>
 
-              <div className="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-200 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-mono uppercase text-emerald-800 font-bold">
-                    1-Click Agent Onboarding Prompt
-                  </span>
-                  <button
-                    onClick={() => copyText(agentOnboardingPrompt, "agent-prompt")}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-xs transition"
-                  >
-                    {copiedId === "agent-prompt" ? (
-                      <>
-                        <Check className="w-3.5 h-3.5" /> Copied!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" /> Copy Prompt
-                      </>
-                    )}
-                  </button>
-                </div>
-                <pre className="text-xs font-mono text-emerald-950 whitespace-pre-wrap break-all bg-white p-3 rounded-lg border border-emerald-200 shadow-2xs">
-                  {agentOnboardingPrompt}
-                </pre>
-              </div>
+              {activeApiKey ? (
+                <>
+                  <div className="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-mono uppercase text-emerald-800 font-bold">
+                        1-Click Agent Onboarding Prompt
+                      </span>
+                      <button
+                        onClick={() => copyText(agentOnboardingPrompt, "agent-prompt")}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-xs transition"
+                      >
+                        {copiedId === "agent-prompt" ? (
+                          <>
+                            <Check className="w-3.5 h-3.5" /> Copied!
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" /> Copy Prompt
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <pre className="text-xs font-mono text-emerald-950 whitespace-pre-wrap break-all bg-white p-3 rounded-lg border border-emerald-200 shadow-2xs">
+                      {agentOnboardingPrompt}
+                    </pre>
+                  </div>
 
-              {/* Generate Additional API Key */}
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
-                  <KeyRound className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>Active Agent API Key:</span>
-                  <code className="text-indigo-700 font-mono font-bold">{activeApiKey}</code>
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newKeyLabel}
-                    onChange={(e) => setNewKeyLabel(e.target.value)}
-                    placeholder="New key label (e.g. India Dev Team Agent)"
-                    className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
-                  />
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                        <KeyRound className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Active Agent API Key:</span>
+                        <code className="text-indigo-700 font-mono font-bold break-all">{activeApiKey}</code>
+                      </div>
+                      <button
+                        onClick={() => copyText(activeApiKey, "raw-key")}
+                        className="px-2 py-0.5 rounded bg-white hover:bg-slate-100 border border-slate-300 text-[11px] font-medium text-slate-700 shadow-2xs"
+                      >
+                        {copiedId === "raw-key" ? "Copied Key!" : "Copy Key"}
+                      </button>
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <input
+                        type="text"
+                        value={newKeyLabel}
+                        onChange={(e) => setNewKeyLabel(e.target.value)}
+                        placeholder="Label for another key (optional)"
+                        className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
+                      >
+                      </input>
+                      <button
+                        onClick={handleGenerateKey}
+                        className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-700 shadow-2xs"
+                      >
+                        Generate New Key
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="p-5 rounded-xl bg-indigo-50/60 border border-indigo-200 space-y-3 text-center">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-100 border border-indigo-200 flex items-center justify-center text-indigo-600 mx-auto">
+                    <KeyRound className="w-5 h-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-bold text-slate-900">
+                      No API Key Active
+                    </h4>
+                    <p className="text-xs text-slate-600 max-w-md mx-auto">
+                      Generate a secure, random API key to configure your agent and unlock the 1-click onboarding prompt.
+                    </p>
+                  </div>
                   <button
                     onClick={handleGenerateKey}
-                    className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-700 shadow-2xs"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition"
                   >
-                    Generate New Key
+                    <Plus className="w-4 h-4 stroke-[2.5]" />
+                    <span>Generate Agent Key</span>
                   </button>
                 </div>
-              </div>
+              )}
 
               <div className="flex items-center justify-between pt-2">
                 <a

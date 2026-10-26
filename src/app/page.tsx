@@ -1,6 +1,5 @@
 import React from "react";
 import { listProjects } from "@/lib/services/lifecycle-service";
-import { DEMO_API_KEY } from "@/db";
 import { auth } from "@/auth";
 import { KeyzorDashboard } from "@/components/keyzor-dashboard";
 
@@ -16,7 +15,7 @@ export default async function HomePage() {
   return (
     <KeyzorDashboard
       initialProjects={projects}
-      defaultApiKey={DEMO_API_KEY}
+      defaultApiKey=""
       userEmail={userEmail}
       userName={userName}
     />

@@ -16,7 +16,6 @@ const globalForDb = globalThis as unknown as {
   __keyzorInitPromise?: Promise<void>;
 };
 
-export const DEMO_API_KEY = "kz_live_demo_architect_2026";
 export const DEFAULT_USER_ID = "usr_architect_peter";
 
 function getOrCreateDbInstance(): DrizzleInstance {
@@ -197,14 +196,6 @@ async function seedInitialWorkspace(activeDb: DrizzleInstance) {
     email: "architect@keyzor.vercel.app",
     name: "Lead Architect (CPO / Dev)",
     provider: "credentials",
-  });
-
-  await activeDb.insert(schema.apiKeys).values({
-    id: "key_default_agent",
-    userId: DEFAULT_USER_ID,
-    name: "Primary Coding Agent (Antigravity / Cursor / Claude)",
-    keyHash: hashApiKey(DEMO_API_KEY),
-    keyPrefix: "kz_live_demo...2026",
   });
 
 }

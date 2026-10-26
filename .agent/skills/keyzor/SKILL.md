@@ -1,4 +1,4 @@
-﻿---
+---
 name: keyzor-project-tracker
 description: Proactively track feature flowcharts, Gantt timelines, stage handoffs (design.md, PRs, prototypes, staging deploys), and the 4 Core Status Questions in KEYZOR. Activate whenever brainstorming new features, finishing architecture docs (design.md), handing work to dev teams, demoing prototypes, opening PRs, or deploying to test/prod.
 ---
@@ -37,37 +37,30 @@ Specifically watch for these 4 developer hats:
 
 ## 3. Authentication
 
-Pass the KEYZOR API Key in the `Authorization` header on write calls (or all calls):
+Pass your generated KEYZOR API Key (`kz_live_...`) in the `Authorization` header on all write requests:
 ```http
-Authorization: Bearer kz_live_demo_architect_2026
+Authorization: Bearer <YOUR_KEYZOR_API_KEY>
 Content-Type: application/json
 ```
 
 ---
 
-## 4. Active Projects on This KEYZOR Instance
-- **Enterprise Cloud Platform v2** (slug: `enterprise-cloud-v2`, id: `proj_core_platform`) — 3 features tracked
-- **OnehealthEHR** (slug: `onehealthehr`, id: `proj_7d60feb8c5`) — 0 features tracked
-- **Keyzor product roadmap** (slug: `keyzor-product-roadmap`, id: `proj_75b718ab0f`) — 0 features tracked
-
----
-
-## 5. Instructional API Endpoints Reference
+## 4. Instructional API Endpoints Reference
 
 Every endpoint returns an `agent_guidance` envelope telling you the current state of the 4 Core Questions, expectations for the active stage, and the exact payload for your next transition.
 
 ### A. List All Projects & Feature Summaries
 ```bash
 curl -s "https://keyzor.vercel.app/api/v1/projects" \
-  -H "Authorization: Bearer kz_live_demo_architect_2026"
+  -H "Authorization: Bearer <YOUR_KEYZOR_API_KEY>"
 ```
 
 ### B. Create a New Feature Flowchart (During Brainstorming or Mini-Project/Bugfix)
 You can omit `customStages` to use the project's default 7-stage Architect Lifecycle (`Brainstorming & Scope` → `Architecture & design.md` → `Handed Over to Dev` → `Prototype Demo` → `Deployed on Dev/Test` → `Bugfixes & Feedback` → `Live in Production`), OR pass `customStages` tailored to the feature!
 
 ```bash
-curl -X POST "https://keyzor.vercel.app/api/v1/projects/enterprise-cloud-v2/features" \
-  -H "Authorization: Bearer kz_live_demo_architect_2026" \
+curl -X POST "https://keyzor.vercel.app/api/v1/projects/<projectSlug>/features" \
+  -H "Authorization: Bearer <YOUR_KEYZOR_API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Customer Usage Export API",
@@ -84,11 +77,11 @@ curl -X POST "https://keyzor.vercel.app/api/v1/projects/enterprise-cloud-v2/feat
 Use `PATCH /api/v1/features/<featureIdOrSlug>/status` for all updates:
 - Set `"action": "advance"` to move to the next stage in the flowchart.
 - Or set `"stageName": "Handed Over to Dev"` to jump to a specific stage by name.
-- Or omit `action`/`stageName` to simply update `currentOwner`, `targetDate`, `expectedDate`, `notes`, or attach `links`.
+- Or omit `"action"`/`"stageName"` to simply update `currentOwner`, `targetDate`, `expectedDate`, `notes`, or attach `links`.
 
 ```bash
-curl -X PATCH "https://keyzor.vercel.app/api/v1/features/enterprise-sso-saml/status" \
-  -H "Authorization: Bearer kz_live_demo_architect_2026" \
+curl -X PATCH "https://keyzor.vercel.app/api/v1/features/<featureSlug>/status" \
+  -H "Authorization: Bearer <YOUR_KEYZOR_API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{
     "action": "advance",
@@ -105,4 +98,3 @@ curl -X PATCH "https://keyzor.vercel.app/api/v1/features/enterprise-sso-saml/sta
     "actorName": "Coding Agent"
   }'
 ```
-

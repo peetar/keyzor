@@ -218,6 +218,9 @@ export function generateKeyzorSkillMarkdown(
           .join("\n")
       : "- No projects created yet. Create one via `POST /api/v1/projects`.";
 
+  const sampleProjectSlug = projects[0]?.slug || "<projectSlug>";
+  const sampleFeatureSlug = projects[0]?.features[0]?.slug || "<featureSlug>";
+
   return `---
 name: keyzor-project-tracker
 description: Proactively track feature flowcharts, Gantt timelines, stage handoffs (design.md, PRs, prototypes, staging deploys), and the 4 Core Status Questions in KEYZOR. Activate whenever brainstorming new features, finishing architecture docs (design.md), handing work to dev teams, demoing prototypes, opening PRs, or deploying to test/prod.
@@ -284,7 +287,7 @@ curl -s "${baseUrl}/api/v1/projects" \\
 You can omit \`customStages\` to use the project's default 7-stage Architect Lifecycle (\`Brainstorming & Scope\` → \`Architecture & design.md\` → \`Handed Over to Dev\` → \`Prototype Demo\` → \`Deployed on Dev/Test\` → \`Bugfixes & Feedback\` → \`Live in Production\`), OR pass \`customStages\` tailored to the feature!
 
 \`\`\`bash
-curl -X POST "${baseUrl}/api/v1/projects/enterprise-cloud-v2/features" \\
+curl -X POST "${baseUrl}/api/v1/projects/${sampleProjectSlug}/features" \\
   -H "Authorization: Bearer ${sampleApiKeyHint}" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -305,7 +308,7 @@ Use \`PATCH /api/v1/features/<featureIdOrSlug>/status\` for all updates:
 - Or omit \`action\`/\`stageName\` to simply update \`currentOwner\`, \`targetDate\`, \`expectedDate\`, \`notes\`, or attach \`links\`.
 
 \`\`\`bash
-curl -X PATCH "${baseUrl}/api/v1/features/enterprise-sso-saml/status" \\
+curl -X PATCH "${baseUrl}/api/v1/features/${sampleFeatureSlug}/status" \\
   -H "Authorization: Bearer ${sampleApiKeyHint}" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -323,5 +326,36 @@ curl -X PATCH "${baseUrl}/api/v1/features/enterprise-sso-saml/status" \\
     "actorName": "Coding Agent"
   }'
 \`\`\`
+`;
+}
+
+export function generateSetupInstructionsMarkdown(baseUrl: string): string {
+  return `---
+name: keyzor-setup
+description: Instructions to connect an AI coding agent to KEYZOR when no API key is provided.
+---
+
+# KEYZOR — Agent Setup Instructions
+
+> **Notice**: No API key was provided with this request.
+
+To connect your AI coding agent (Antigravity, Cursor, Claude Code) to KEYZOR and start tracking feature flowcharts:
+
+1. **Log in**:
+   Open [${baseUrl}](${baseUrl}) in your browser and sign in.
+
+2. **Create a project**:
+   If you don't have a project yet, create your first project on the dashboard.
+
+3. **Generate an Agent API Key**:
+   Click the **"Agent Skill (/hello)"** button in the top navigation bar and click **"Generate New Key"**. Your secret key will be generated securely (e.g. \`kz_live_...\`).
+
+4. **Query with your valid key**:
+   Instruct your agent:
+   \`\`\`bash
+   Fetch ${baseUrl}/hello?format=skill&key=<YOUR_AGENT_KEY> and save the returned instructions as your KEYZOR skill (SKILL.md).
+   \`\`\`
+
+Once installed with your unique key, your agent will proactively track your feature flowcharts, design.md handoffs, prototype demos, and PRs!
 `;
 }
