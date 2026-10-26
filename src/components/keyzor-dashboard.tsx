@@ -118,9 +118,16 @@ export function KeyzorDashboard({
             if (pj.data?.project) fullList.push(pj.data.project);
           }
         }
-        if (fullList.length > 0) {
-          setProjects(fullList);
-          if (keepProjectId) setSelectedProjectId(keepProjectId);
+        setProjects(fullList);
+        if (keepProjectId && fullList.some((p) => p.id === keepProjectId)) {
+          setSelectedProjectId(keepProjectId);
+        } else if (
+          fullList.length > 0 &&
+          !fullList.some((p) => p.id === selectedProjectId)
+        ) {
+          setSelectedProjectId(fullList[0].id);
+        } else if (fullList.length === 0) {
+          setSelectedProjectId("");
         }
       }
     } finally {
@@ -345,13 +352,18 @@ export function KeyzorDashboard({
                 aria-label="Select Project"
                 value={currentProject?.id || ""}
                 onChange={(e) => setSelectedProjectId(e.target.value)}
-                className="bg-white border border-slate-300 hover:border-indigo-400 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                disabled={projects.length === 0}
+                className="bg-white border border-slate-300 hover:border-indigo-400 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:opacity-60"
               >
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.features.length} features)
-                  </option>
-                ))}
+                {projects.length === 0 ? (
+                  <option value="">No projects</option>
+                ) : (
+                  projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.features.length} features)
+                    </option>
+                  ))
+                )}
               </select>
               <button
                 onClick={() => setShowNewProjectModal(true)}
@@ -377,7 +389,8 @@ export function KeyzorDashboard({
             {/* Encrypted Stakeholder Share Link Button */}
             <button
               onClick={() => setShowShareModal(true)}
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 border border-purple-300 text-purple-800 text-xs font-semibold transition shadow-2xs"
+              disabled={!currentProject}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 border border-purple-300 text-purple-800 text-xs font-semibold transition shadow-2xs disabled:opacity-50 disabled:pointer-events-none"
             >
               <Share2 className="w-3.5 h-3.5 text-purple-600" />
               <span>Stakeholder Share Link</span>
@@ -385,7 +398,13 @@ export function KeyzorDashboard({
 
             {/* New Feature Flowchart Button */}
             <button
-              onClick={() => setShowNewFeatureModal(true)}
+              onClick={() => {
+                if (!currentProject) {
+                  setShowNewProjectModal(true);
+                } else {
+                  setShowNewFeatureModal(true);
+                }
+              }}
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition shadow-sm"
             >
               <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -411,9 +430,31 @@ export function KeyzorDashboard({
 
       {/* Main Content Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-6 space-y-6">
-        {/* Project Header & View Mode Toggle */}
-        {currentProject && (
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
+        {!currentProject ? (
+          <div className="flex flex-col items-center justify-center p-12 text-center bg-white border border-slate-200/90 rounded-2xl shadow-xs max-w-lg mx-auto my-16 space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600">
+              <Plus className="w-6 h-6 stroke-[2.5]" />
+            </div>
+            <div className="space-y-1.5">
+              <h2 className="text-lg font-bold text-slate-900">
+                Create a new project to begin
+              </h2>
+              <p className="text-xs text-slate-500 max-w-sm">
+                Get started by creating your first project to track feature flowcharts, timelines, and developer handoffs.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowNewProjectModal(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition"
+            >
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <span>Create Project</span>
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Project Header & View Mode Toggle */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
             <div>
               <div className="flex items-center gap-2.5">
                 <h1 className="text-xl font-bold text-slate-900">
@@ -479,7 +520,6 @@ export function KeyzorDashboard({
               </button>
             </div>
           </div>
-        )}
 
         {/* At-A-Glance 4 Core Questions Summary Matrix */}
         {currentProject && currentProject.features.length > 0 && (
@@ -563,8 +603,25 @@ export function KeyzorDashboard({
         )}
 
         {/* Feature Cards with 4 Questions + Flowchart / Gantt Views */}
-        <div className="space-y-6">
-          {currentProject?.features.map((feature) => (
+        {currentProject.features.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-10 text-center bg-white border border-slate-200/90 rounded-2xl shadow-xs space-y-3">
+            <h3 className="text-base font-bold text-slate-900">
+              No feature flows yet
+            </h3>
+            <p className="text-xs text-slate-500 max-w-sm">
+              Add your first feature flowchart to start tracking development lifecycle stages.
+            </p>
+            <button
+              onClick={() => setShowNewFeatureModal(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition"
+            >
+              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>Add Feature Flow</span>
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {currentProject.features.map((feature) => (
             <section
               key={feature.id}
               className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition"
@@ -637,7 +694,8 @@ export function KeyzorDashboard({
               )}
             </section>
           ))}
-        </div>
+          </div>
+        )}
 
         {/* Recent Agent & Architect Activity Feed */}
         {currentProject && currentProject.recentActivity.length > 0 && (
@@ -679,6 +737,8 @@ export function KeyzorDashboard({
               ))}
             </div>
           </section>
+        )}
+          </>
         )}
       </main>
 
