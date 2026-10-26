@@ -30,15 +30,15 @@ export function LinkBadge({
   const getIcon = () => {
     switch (link.linkType) {
       case "design_doc":
-        return <FileCode2 className="w-3.5 h-3.5 text-violet-400" />;
+        return <FileCode2 className="w-3.5 h-3.5 text-purple-600" />;
       case "github":
-        return <GitPullRequest className="w-3.5 h-3.5 text-sky-400" />;
+        return <GitPullRequest className="w-3.5 h-3.5 text-sky-600" />;
       case "preview_url":
-        return <Globe className="w-3.5 h-3.5 text-emerald-400" />;
+        return <Globe className="w-3.5 h-3.5 text-emerald-600" />;
       case "trello":
-        return <Trello className="w-3.5 h-3.5 text-amber-400" />;
+        return <Trello className="w-3.5 h-3.5 text-amber-600" />;
       default:
-        return <Link2 className="w-3.5 h-3.5 text-slate-400" />;
+        return <Link2 className="w-3.5 h-3.5 text-slate-500" />;
     }
   };
 
@@ -47,12 +47,12 @@ export function LinkBadge({
       href={link.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700/80 hover:border-sky-500/50 text-xs text-slate-200 transition group"
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-xs text-slate-800 transition group shadow-xs"
       title={`Added by ${link.createdBy || "Agent"} • ${link.url}`}
     >
       {getIcon()}
       <span className="truncate max-w-[180px] font-medium">{link.label}</span>
-      <ExternalLink className="w-3 h-3 text-slate-500 group-hover:text-sky-400 transition" />
+      <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-indigo-600 transition" />
     </a>
   );
 }
@@ -66,27 +66,27 @@ export function ScheduleHealthBadge({
 
   if (scheduleHealth === "slipping" && scheduleVarianceDays !== null) {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-        <AlertTriangle className="w-3 h-3" />+{scheduleVarianceDays}d Slipping
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+        <AlertTriangle className="w-3 h-3 text-rose-500" />+{scheduleVarianceDays}d Slipping
       </span>
     );
   }
   if (scheduleHealth === "early" && scheduleVarianceDays !== null) {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-teal-50 text-teal-700 border border-teal-200">
         {Math.abs(scheduleVarianceDays)}d Ahead
       </span>
     );
   }
   if (scheduleHealth === "on_track") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sky-500/15 text-sky-300 border border-sky-500/30">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
         On Track
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-800 text-slate-400 border border-slate-700">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
       TBD
     </span>
   );
@@ -108,26 +108,26 @@ export function FourQuestionsCardRow({
   const q = feature.fourQuestions;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4 bg-slate-950/60 border-b border-slate-800/80">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4 bg-slate-50/70 border-b border-slate-200/80">
       {/* 1. WHERE IS THIS FEATURE? */}
-      <div className="bg-slate-900/80 border border-slate-800/90 rounded-lg p-3 flex flex-col justify-between">
-        <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-400 mb-1">
+      <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-xs flex flex-col justify-between">
+        <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-1">
           <span>1. Where is this feature?</span>
-          <span className="text-sky-400 font-semibold">
+          <span className="text-indigo-600 font-semibold">
             {q.where.stageIndex + 1}/{q.where.totalStages} ({q.where.percentComplete}%)
           </span>
         </div>
         <div className="flex items-center justify-between gap-2 mt-1">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="w-2.5 h-2.5 rounded-full bg-sky-400 animate-pulse shrink-0" />
-            <span className="text-sm font-semibold text-white truncate">
+            <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse shrink-0" />
+            <span className="text-sm font-bold text-slate-900 truncate">
               {q.where.stageName}
             </span>
           </div>
           {!readOnly && onQuickAdvance && q.where.stageIndex + 1 < q.where.totalStages && (
             <button
               onClick={() => onQuickAdvance(feature)}
-              className="px-2 py-1 rounded bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-300 text-xs font-medium inline-flex items-center gap-1 shrink-0 transition"
+              className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-xs font-semibold inline-flex items-center gap-1 shrink-0 transition shadow-2xs"
               title="Advance to next stage in 1 click"
             >
               Advance <ArrowRight className="w-3 h-3" />
@@ -137,19 +137,19 @@ export function FourQuestionsCardRow({
       </div>
 
       {/* 2. WHO IS WORKING ON IT? */}
-      <div className="bg-slate-900/80 border border-slate-800/90 rounded-lg p-3 flex flex-col justify-between">
-        <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-400 mb-1">
+      <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-xs flex flex-col justify-between">
+        <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-1">
           <span>2. Who is working on it?</span>
-          <User className="w-3.5 h-3.5 text-violet-400" />
+          <User className="w-3.5 h-3.5 text-purple-600" />
         </div>
         <div className="flex items-center justify-between gap-2 mt-1">
-          <span className="text-sm font-semibold text-slate-100 truncate">
+          <span className="text-sm font-semibold text-slate-800 truncate">
             {q.who}
           </span>
           {!readOnly && onOpenEditModal && (
             <button
               onClick={() => onOpenEditModal(feature)}
-              className="text-[11px] text-slate-400 hover:text-sky-400 underline shrink-0"
+              className="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium underline shrink-0"
             >
               Edit
             </button>
@@ -158,33 +158,33 @@ export function FourQuestionsCardRow({
       </div>
 
       {/* 3. WHEN DO WE WANT IT DONE? */}
-      <div className="bg-slate-900/80 border border-slate-800/90 rounded-lg p-3 flex flex-col justify-between">
-        <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-400 mb-1">
+      <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-xs flex flex-col justify-between">
+        <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-1">
           <span>3. When do we want it done?</span>
           <Calendar className="w-3.5 h-3.5 text-slate-400" />
         </div>
         <div className="flex items-center justify-between gap-2 mt-1">
-          <span className="text-sm font-mono font-semibold text-slate-200">
+          <span className="text-sm font-mono font-bold text-slate-900">
             {q.whenWantDone || "Not set"}
           </span>
-          <span className="text-[11px] text-slate-500">Target Deadline</span>
+          <span className="text-[11px] text-slate-500 font-medium">Target Deadline</span>
         </div>
       </div>
 
       {/* 4. WHEN DO WE EXPECT IT TO BE DONE? */}
-      <div className="bg-slate-900/80 border border-slate-800/90 rounded-lg p-3 flex flex-col justify-between">
-        <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-400 mb-1">
+      <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-xs flex flex-col justify-between">
+        <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-1">
           <span>4. When do we expect it done?</span>
           <ScheduleHealthBadge feature={feature} />
         </div>
         <div className="flex items-center justify-between gap-2 mt-1">
-          <span className="text-sm font-mono font-semibold text-white">
+          <span className="text-sm font-mono font-bold text-slate-900">
             {q.whenExpectDone || "Not set"}
           </span>
           {!readOnly && onOpenEditModal && (
             <button
               onClick={() => onOpenEditModal(feature)}
-              className="text-[11px] text-slate-400 hover:text-sky-400 underline shrink-0"
+              className="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium underline shrink-0"
             >
               Update Date
             </button>
@@ -205,7 +205,7 @@ export function FeatureFlowchartView({
   onSelectStage?: (feature: EnrichedFeature, stage: EnrichedStage) => void;
 }) {
   return (
-    <div className="p-5 overflow-x-auto">
+    <div className="p-5 overflow-x-auto bg-slate-50/40">
       <div className="flex items-stretch gap-3 min-w-max">
         {feature.stages.map((stage, index) => {
           const isCompleted = stage.status === "completed";
@@ -216,49 +216,49 @@ export function FeatureFlowchartView({
             <React.Fragment key={stage.id}>
               <div
                 onClick={() => !readOnly && onSelectStage?.(feature, stage)}
-                className={`w-64 rounded-xl p-4 border transition flex flex-col justify-between relative ${
+                className={`w-64 rounded-xl p-4 border transition flex flex-col justify-between relative shadow-xs ${
                   !readOnly ? "cursor-pointer" : ""
                 } ${
                   isCurrent
-                    ? "bg-sky-950/30 border-sky-500/70 shadow-lg shadow-sky-500/10"
+                    ? "bg-indigo-50/90 border-2 border-indigo-500 shadow-md shadow-indigo-500/10 ring-2 ring-indigo-200"
                     : isCompleted
-                    ? "bg-emerald-950/20 border-emerald-500/35 hover:border-emerald-500/60"
-                    : "bg-slate-900/50 border-slate-800/90 hover:border-slate-700"
+                    ? "bg-emerald-50/70 border border-emerald-300 hover:border-emerald-400"
+                    : "bg-white border border-slate-200 hover:border-slate-300"
                 }`}
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="text-[11px] font-mono text-slate-400">
+                    <span className="text-[11px] font-mono text-slate-500 font-medium">
                       STAGE {index + 1}
                     </span>
                     {isCompleted ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                        <CheckCircle2 className="w-3 h-3" /> Done
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Done
                       </span>
                     ) : isCurrent ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sky-500/20 text-sky-300 border border-sky-400/40">
-                        <CircleDot className="w-3 h-3 animate-spin" /> Active Now
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-300 shadow-2xs">
+                        <CircleDot className="w-3 h-3 animate-spin text-indigo-600" /> Active Now
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] text-slate-400 bg-slate-800/80">
-                        <Clock className="w-3 h-3" /> Pending
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium text-slate-500 bg-slate-100">
+                        <Clock className="w-3 h-3 text-slate-400" /> Pending
                       </span>
                     )}
                   </div>
 
-                  <h4 className="font-semibold text-sm text-slate-100 mb-1">
+                  <h4 className="font-bold text-sm text-slate-900 mb-1">
                     {stage.name}
                   </h4>
 
-                  <div className="text-xs text-slate-400 flex items-center gap-1.5 mb-2">
-                    <User className="w-3 h-3 text-slate-500 shrink-0" />
+                  <div className="text-xs text-slate-600 flex items-center gap-1.5 mb-2 font-medium">
+                    <User className="w-3 h-3 text-slate-400 shrink-0" />
                     <span className="truncate">
                       {stage.owner || feature.currentOwner}
                     </span>
                   </div>
 
                   {stage.notes && (
-                    <p className="text-xs text-slate-300 bg-slate-950/70 border border-slate-800/80 rounded-md p-2 mb-2 line-clamp-3">
+                    <p className="text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-md p-2 mb-2 line-clamp-3">
                       {stage.notes}
                     </p>
                   )}
@@ -277,7 +277,7 @@ export function FeatureFlowchartView({
                   )}
                 </div>
 
-                <div className="mt-3 pt-2.5 border-t border-slate-800/70 flex items-center justify-between text-[11px] font-mono text-slate-400">
+                <div className="mt-3 pt-2.5 border-t border-slate-200/80 flex items-center justify-between text-[11px] font-mono text-slate-500">
                   <span>
                     {stage.actualStartDate || stage.plannedStartDate || "—"}
                   </span>
@@ -292,12 +292,12 @@ export function FeatureFlowchartView({
                 <div className="flex items-center justify-center">
                   <div
                     className={`w-6 h-0.5 ${
-                      isCompleted ? "bg-emerald-500/60" : "bg-slate-800"
+                      isCompleted ? "bg-emerald-400" : "bg-slate-200"
                     }`}
                   />
                   <ArrowRight
                     className={`w-4 h-4 -ml-1 ${
-                      isCompleted ? "text-emerald-400" : "text-slate-700"
+                      isCompleted ? "text-emerald-500" : "text-slate-300"
                     }`}
                   />
                 </div>
@@ -375,34 +375,34 @@ export function FeatureGanttView({
   }
 
   return (
-    <div className="p-5">
+    <div className="p-5 bg-white">
       {/* Legend & Key Date Markers */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4 text-xs">
-        <div className="flex flex-wrap items-center gap-4 text-slate-400">
+        <div className="flex flex-wrap items-center gap-4 text-slate-600 font-medium">
           <span className="inline-flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-sm bg-emerald-500/80 inline-block" />
+            <span className="w-3 h-3 rounded-sm bg-emerald-500 inline-block shadow-2xs" />
             Completed Stage
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-sm bg-sky-500 inline-block" />
+            <span className="w-3 h-3 rounded-sm bg-indigo-600 inline-block shadow-2xs" />
             Active Stage ("Where")
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-sm bg-slate-700 border border-slate-600 inline-block" />
+            <span className="w-3 h-3 rounded-sm bg-slate-200 border border-slate-300 inline-block" />
             Planned / Upcoming
           </span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4 font-mono text-[11px]">
+        <div className="flex flex-wrap items-center gap-4 font-mono text-[11px] font-semibold">
           {feature.targetDate && (
-            <span className="inline-flex items-center gap-1.5 text-violet-300">
-              <span className="w-2 h-3 bg-violet-400 inline-block rounded-sm" />
+            <span className="inline-flex items-center gap-1.5 text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+              <span className="w-2 h-3 bg-purple-600 inline-block rounded-sm" />
               Want Done: {feature.targetDate}
             </span>
           )}
           {feature.expectedDate && (
-            <span className="inline-flex items-center gap-1.5 text-amber-300">
-              <span className="w-2 h-3 bg-amber-400 inline-block rounded-sm" />
+            <span className="inline-flex items-center gap-1.5 text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+              <span className="w-2 h-3 bg-amber-500 inline-block rounded-sm" />
               Expect Done: {feature.expectedDate}
             </span>
           )}
@@ -410,10 +410,10 @@ export function FeatureGanttView({
       </div>
 
       {/* Gantt Chart Grid */}
-      <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-950/60">
+      <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-xs">
         {/* Timeline Header */}
-        <div className="grid grid-cols-12 border-b border-slate-800 bg-slate-900/90 text-[11px] font-mono text-slate-400">
-          <div className="col-span-4 sm:col-span-3 px-4 py-2.5 border-r border-slate-800 font-semibold text-slate-300">
+        <div className="grid grid-cols-12 border-b border-slate-200 bg-slate-50 text-[11px] font-mono text-slate-600">
+          <div className="col-span-4 sm:col-span-3 px-4 py-2.5 border-r border-slate-200 font-bold text-slate-700">
             STAGE / OWNER
           </div>
           <div className="col-span-8 sm:col-span-9 relative h-9">
@@ -421,7 +421,7 @@ export function FeatureGanttView({
               <div
                 key={i}
                 style={{ left: `${t.pct}%` }}
-                className="absolute top-0 bottom-0 border-l border-slate-800/80 pl-1.5 pt-2 text-[10px] text-slate-500 select-none"
+                className="absolute top-0 bottom-0 border-l border-slate-200 pl-1.5 pt-2 text-[10px] text-slate-500 font-medium select-none"
               >
                 {t.label}
               </div>
@@ -430,7 +430,7 @@ export function FeatureGanttView({
         </div>
 
         {/* Stage Rows */}
-        <div className="divide-y divide-slate-800/60 relative">
+        <div className="divide-y divide-slate-200/80 relative">
           {feature.stages.map((stage, idx) => {
             const isCompleted = stage.status === "completed";
             const isCurrent =
@@ -462,21 +462,21 @@ export function FeatureGanttView({
                 key={stage.id}
                 onClick={() => !readOnly && onSelectStage?.(feature, stage)}
                 className={`grid grid-cols-12 items-center transition ${
-                  !readOnly ? "hover:bg-slate-900/60 cursor-pointer" : ""
-                } ${isCurrent ? "bg-sky-950/15" : ""}`}
+                  !readOnly ? "hover:bg-slate-50/80 cursor-pointer" : ""
+                } ${isCurrent ? "bg-indigo-50/40" : ""}`}
               >
-                <div className="col-span-4 sm:col-span-3 px-4 py-3 border-r border-slate-800/80 min-w-0">
+                <div className="col-span-4 sm:col-span-3 px-4 py-3 border-r border-slate-200 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-mono text-slate-500">
+                    <span className="text-[11px] font-mono text-slate-400 font-medium">
                       {idx + 1}.
                     </span>
                     <span
-                      className={`text-xs font-medium truncate ${
+                      className={`text-xs truncate ${
                         isCurrent
-                          ? "text-sky-300 font-semibold"
+                          ? "text-indigo-800 font-bold"
                           : isCompleted
-                          ? "text-slate-200"
-                          : "text-slate-400"
+                          ? "text-slate-800 font-medium"
+                          : "text-slate-500 font-normal"
                       }`}
                     >
                       {stage.name}
@@ -493,14 +493,14 @@ export function FeatureGanttView({
                     <div
                       key={i}
                       style={{ left: `${t.pct}%` }}
-                      className="absolute top-0 bottom-0 border-l border-slate-900 pointer-events-none"
+                      className="absolute top-0 bottom-0 border-l border-slate-100 pointer-events-none"
                     />
                   ))}
 
                   {/* Today Line */}
                   <div
                     style={{ left: `${todayPct}%` }}
-                    className="absolute top-0 bottom-0 border-l border-dashed border-sky-500/40 pointer-events-none z-10"
+                    className="absolute top-0 bottom-0 border-l-2 border-dashed border-indigo-400 pointer-events-none z-10"
                     title={`Today (${todayIso})`}
                   />
 
@@ -508,7 +508,7 @@ export function FeatureGanttView({
                   {targetPct !== null && (
                     <div
                       style={{ left: `${targetPct}%` }}
-                      className="absolute top-0 bottom-0 border-l-2 border-violet-500/50 pointer-events-none z-10"
+                      className="absolute top-0 bottom-0 border-l-2 border-purple-500 pointer-events-none z-10"
                       title={`Target Date — Want Done (${feature.targetDate})`}
                     />
                   )}
@@ -517,7 +517,7 @@ export function FeatureGanttView({
                   {expectedPct !== null && (
                     <div
                       style={{ left: `${expectedPct}%` }}
-                      className="absolute top-0 bottom-0 border-l-2 border-amber-500/60 pointer-events-none z-10"
+                      className="absolute top-0 bottom-0 border-l-2 border-amber-500 pointer-events-none z-10"
                       title={`Expected Date — Expect Done (${feature.expectedDate})`}
                     />
                   )}
@@ -525,18 +525,18 @@ export function FeatureGanttView({
                   {/* Gantt Duration Bar */}
                   <div
                     style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
-                    className={`relative z-20 h-7 rounded-md px-2.5 flex items-center justify-between gap-2 text-[11px] font-medium shadow-sm transition ${
+                    className={`relative z-20 h-7 rounded-lg px-2.5 flex items-center justify-between gap-2 text-[11px] shadow-sm transition ${
                       isCurrent
-                        ? "bg-sky-500 text-slate-950 font-semibold ring-2 ring-sky-400/50"
+                        ? "bg-gradient-to-r from-indigo-600 to-sky-600 text-white font-bold ring-2 ring-indigo-400/50 shadow-indigo-500/20"
                         : isCompleted
-                        ? "bg-emerald-500/80 text-slate-950"
-                        : "bg-slate-800 text-slate-300 border border-slate-700"
+                        ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-medium"
+                        : "bg-slate-100 text-slate-700 border border-slate-300 font-medium"
                     }`}
                   >
                     <span className="truncate">
                       {stage.name}
                     </span>
-                    <span className="font-mono text-[10px] opacity-80 shrink-0 hidden md:inline">
+                    <span className="font-mono text-[10px] opacity-90 shrink-0 hidden md:inline">
                       {startIso ? startIso.slice(5) : ""}
                       {endIso ? `→${endIso.slice(5)}` : ""}
                     </span>
@@ -550,17 +550,17 @@ export function FeatureGanttView({
 
       {/* Stage Instructions & Proactive Agent Trigger Footer */}
       {!readOnly && (
-        <div className="mt-3 px-4 py-2.5 rounded-lg bg-slate-900/70 border border-slate-800/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-400">
+        <div className="mt-3 px-4 py-2.5 rounded-lg bg-indigo-50/70 border border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-700">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-sky-400 shrink-0" />
+            <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
             <span>
-              <strong className="text-slate-200">Proactive Agent Skill Trigger:</strong>{" "}
+              <strong className="text-indigo-950 font-semibold">Proactive Agent Skill Trigger:</strong>{" "}
               {feature.stages.find((s) => s.id === feature.currentStageId)
                 ?.proactiveTrigger ||
                 "Agent will ask 'Would you like to update the KEYZOR flowchart?' when the current milestone finishes."}
             </span>
           </div>
-          <span className="text-[11px] font-mono text-slate-500 shrink-0">
+          <span className="text-[11px] font-mono text-indigo-700/80 shrink-0 font-medium">
             Click any bar to edit dates or attach links
           </span>
         </div>

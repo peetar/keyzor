@@ -315,29 +315,29 @@ export function KeyzorDashboard({
   const agentOnboardingPrompt = `Fetch ${origin}/hello?format=skill&key=${activeApiKey} and save the returned instructions as your KEYZOR skill (SKILL.md). Whenever we brainstorm a new feature, finish a design.md, demo a prototype, or open a PR, ask me: "Would you like to update the KEYZOR flowchart?"`;
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#090D16] text-slate-100">
+    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
       {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-30 bg-[#090D16]/90 backdrop-blur-md border-b border-slate-800/90 px-6 py-3.5">
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/90 px-6 py-3.5 shadow-2xs">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           {/* Brand & Project Switcher */}
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-sky-500/15 border border-sky-400/40 flex items-center justify-center text-sky-400 font-bold text-sm">
+              <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 font-bold text-base shadow-2xs">
                 K
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-bold tracking-tight text-white">
+                  <span className="font-bold tracking-tight text-slate-900 text-base">
                     KEYZOR
                   </span>
-                  <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30">
+                  <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 font-semibold">
                     AI-Native Flowchart
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="h-5 w-px bg-slate-800 hidden sm:block" />
+            <div className="h-5 w-px bg-slate-200 hidden sm:block" />
 
             {/* Project Selector */}
             <div className="flex items-center gap-2">
@@ -345,7 +345,7 @@ export function KeyzorDashboard({
                 aria-label="Select Project"
                 value={currentProject?.id || ""}
                 onChange={(e) => setSelectedProjectId(e.target.value)}
-                className="bg-slate-900 border border-slate-700/90 hover:border-sky-500/50 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                className="bg-white border border-slate-300 hover:border-indigo-400 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
               >
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -355,7 +355,7 @@ export function KeyzorDashboard({
               </select>
               <button
                 onClick={() => setShowNewProjectModal(true)}
-                className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition"
+                className="p-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-600 hover:text-slate-900 transition shadow-2xs"
                 title="Create New Project"
               >
                 <Plus className="w-4 h-4" />
@@ -368,38 +368,38 @@ export function KeyzorDashboard({
             {/* Agent Skill /hello Button */}
             <button
               onClick={() => setShowAgentModal(true)}
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 text-xs font-semibold transition"
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-semibold transition shadow-2xs"
             >
-              <Terminal className="w-3.5 h-3.5" />
+              <Terminal className="w-3.5 h-3.5 text-emerald-600" />
               <span>Agent Skill (/hello)</span>
             </button>
 
             {/* Encrypted Stakeholder Share Link Button */}
             <button
               onClick={() => setShowShareModal(true)}
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/40 text-violet-300 text-xs font-semibold transition"
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 border border-purple-300 text-purple-800 text-xs font-semibold transition shadow-2xs"
             >
-              <Share2 className="w-3.5 h-3.5" />
+              <Share2 className="w-3.5 h-3.5 text-purple-600" />
               <span>Stakeholder Share Link</span>
             </button>
 
             {/* New Feature Flowchart Button */}
             <button
               onClick={() => setShowNewFeatureModal(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-semibold transition shadow-sm"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition shadow-sm"
             >
               <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
               <span>New Feature Flow</span>
             </button>
 
             {/* User Badge & Sign Out */}
-            <div className="hidden lg:flex items-center gap-2 pl-2 border-l border-slate-800 text-xs text-slate-400">
-              <span className="truncate max-w-[140px]" title={userEmail}>
+            <div className="hidden lg:flex items-center gap-2 pl-2 border-l border-slate-200 text-xs text-slate-500">
+              <span className="truncate max-w-[140px] font-medium" title={userEmail}>
                 {userName}
               </span>
               <a
                 href="/login"
-                className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200"
+                className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition"
                 title="Switch Hat / Account"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -413,17 +413,17 @@ export function KeyzorDashboard({
       <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-6 space-y-6">
         {/* Project Header & View Mode Toggle */}
         {currentProject && (
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/50 border border-slate-800/90 rounded-2xl p-5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
             <div>
               <div className="flex items-center gap-2.5">
-                <h1 className="text-xl font-bold text-white">
+                <h1 className="text-xl font-bold text-slate-900">
                   {currentProject.name}
                 </h1>
-                <span className="text-xs font-mono text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200 font-medium">
                   /{currentProject.slug}
                 </span>
               </div>
-              <p className="text-sm text-slate-400 mt-1">
+              <p className="text-sm text-slate-500 mt-1">
                 {currentProject.description ||
                   "Tracking feature lifecycle across CPO brainstorming, design.md handoff, prototype demo, test deploy, and production."}
               </p>
@@ -431,13 +431,13 @@ export function KeyzorDashboard({
 
             {/* Display Preference Toggle: Flowchart vs Gantt vs Split */}
             <div className="flex items-center gap-2 self-start md:self-auto">
-              <div className="inline-flex rounded-xl bg-slate-950 p-1 border border-slate-800">
+              <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 shadow-2xs">
                 <button
                   onClick={() => setViewMode("gantt")}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
                     viewMode === "gantt"
-                      ? "bg-sky-500 text-slate-950 font-semibold"
-                      : "text-slate-400 hover:text-slate-200"
+                      ? "bg-indigo-600 text-white font-semibold shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
                   <BarChart3 className="w-3.5 h-3.5" />
@@ -447,8 +447,8 @@ export function KeyzorDashboard({
                   onClick={() => setViewMode("flowchart")}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
                     viewMode === "flowchart"
-                      ? "bg-sky-500 text-slate-950 font-semibold"
-                      : "text-slate-400 hover:text-slate-200"
+                      ? "bg-indigo-600 text-white font-semibold shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
                   <GitCommitHorizontal className="w-3.5 h-3.5" />
@@ -458,8 +458,8 @@ export function KeyzorDashboard({
                   onClick={() => setViewMode("both")}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
                     viewMode === "both"
-                      ? "bg-sky-500 text-slate-950 font-semibold"
-                      : "text-slate-400 hover:text-slate-200"
+                      ? "bg-indigo-600 text-white font-semibold shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
                   <Layers className="w-3.5 h-3.5" />
@@ -469,11 +469,11 @@ export function KeyzorDashboard({
 
               <button
                 onClick={() => refreshProjects(currentProject.id)}
-                className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-sky-400 transition"
+                className="p-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 hover:text-indigo-600 transition shadow-2xs"
                 title="Refresh latest AI agent updates"
               >
                 <RefreshCw
-                  className={`w-4 h-4 ${isLoading ? "animate-spin text-sky-400" : ""}`}
+                  className={`w-4 h-4 ${isLoading ? "animate-spin text-indigo-600" : ""}`}
                 />
               </button>
             </div>
@@ -482,22 +482,22 @@ export function KeyzorDashboard({
 
         {/* At-A-Glance 4 Core Questions Summary Matrix */}
         {currentProject && currentProject.features.length > 0 && (
-          <div className="bg-slate-900/40 border border-slate-800/90 rounded-2xl overflow-hidden">
-            <div className="px-5 py-3 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
+          <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
+            <div className="px-5 py-3.5 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-sky-400" />
-                <h2 className="text-xs font-mono uppercase tracking-wider text-slate-300 font-semibold">
+                <Sparkles className="w-4 h-4 text-indigo-600" />
+                <h2 className="text-xs font-mono uppercase tracking-wider text-slate-800 font-bold">
                   Executive Overview — The 4 Core Questions Across All Features
                 </h2>
               </div>
-              <span className="text-[11px] text-slate-400">
+              <span className="text-[11px] text-slate-500 font-medium">
                 Click any row or stage below to update status or attach links
               </span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-sm">
                 <thead>
-                  <tr className="border-b border-slate-800/80 text-[11px] font-mono uppercase text-slate-400 bg-slate-950/40">
+                  <tr className="border-b border-slate-200 text-[11px] font-mono uppercase text-slate-600 bg-slate-50 font-semibold">
                     <th className="py-2.5 px-4">Feature</th>
                     <th className="py-2.5 px-4">1. Where is it? (Stage)</th>
                     <th className="py-2.5 px-4">2. Who is working on it?</th>
@@ -506,38 +506,38 @@ export function KeyzorDashboard({
                     <th className="py-2.5 px-4">Key Links</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
+                <tbody className="divide-y divide-slate-200/80">
                   {currentProject.features.map((feat) => (
                     <tr
                       key={feat.id}
                       onClick={() => openEditor(feat)}
-                      className="hover:bg-slate-900/70 cursor-pointer transition"
+                      className="hover:bg-slate-50/80 cursor-pointer transition"
                     >
-                      <td className="py-3 px-4 font-semibold text-white">
+                      <td className="py-3 px-4 font-bold text-slate-900">
                         <div>{feat.title}</div>
-                        <div className="text-xs text-slate-400 font-normal truncate max-w-xs">
+                        <div className="text-xs text-slate-500 font-normal truncate max-w-xs">
                           {feat.summary}
                         </div>
                       </td>
                       <td className="py-3 px-4">
-                        <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-sky-500/15 border border-sky-500/30 text-sky-300 text-xs font-medium">
-                          <span className="w-2 h-2 rounded-full bg-sky-400" />
+                        <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold">
+                          <span className="w-2 h-2 rounded-full bg-indigo-600" />
                           {feat.fourQuestions.where.stageName}
-                          <span className="text-slate-400 font-mono text-[11px]">
+                          <span className="text-slate-500 font-mono text-[11px]">
                             ({feat.fourQuestions.where.stageIndex + 1}/
                             {feat.fourQuestions.where.totalStages})
                           </span>
                         </div>
                       </td>
-                      <td className="py-3 px-4 text-xs text-slate-200 font-medium">
+                      <td className="py-3 px-4 text-xs text-slate-700 font-medium">
                         {feat.fourQuestions.who}
                       </td>
-                      <td className="py-3 px-4 font-mono text-xs text-slate-300">
+                      <td className="py-3 px-4 font-mono text-xs text-slate-600 font-semibold">
                         {feat.fourQuestions.whenWantDone || "—"}
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs text-white font-semibold">
+                          <span className="font-mono text-xs text-slate-900 font-bold">
                             {feat.fourQuestions.whenExpectDone || "—"}
                           </span>
                           <ScheduleHealthBadge feature={feat} />
@@ -552,7 +552,7 @@ export function KeyzorDashboard({
                             <LinkBadge key={l.id} link={l} />
                           ))}
                           {feat.links.length === 0 && (
-                            <span className="text-xs text-slate-500">None</span>
+                            <span className="text-xs text-slate-400">None</span>
                           )}
                         </div>
                       </td>
@@ -569,21 +569,21 @@ export function KeyzorDashboard({
           {currentProject?.features.map((feature) => (
             <section
               key={feature.id}
-              className="bg-slate-900/50 border border-slate-800/90 rounded-2xl overflow-hidden shadow-lg"
+              className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition"
             >
               {/* Feature Title & Quick Links Bar */}
-              <div className="px-5 py-4 bg-slate-900 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4">
+              <div className="px-5 py-4 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2.5">
-                    <h3 className="text-lg font-bold text-white">
+                    <h3 className="text-lg font-bold text-slate-900">
                       {feature.title}
                     </h3>
-                    <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">
+                    <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200 font-medium">
                       {feature.slug}
                     </span>
                   </div>
                   {feature.summary && (
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-xs text-slate-500 mt-1">
                       {feature.summary}
                     </p>
                   )}
@@ -595,7 +595,7 @@ export function KeyzorDashboard({
                   ))}
                   <button
                     onClick={() => openEditor(feature)}
-                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 transition"
+                    className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-700 shadow-2xs transition"
                   >
                     Update Stage / Links
                   </button>
@@ -612,10 +612,10 @@ export function KeyzorDashboard({
 
               {/* Visualization Area: Flowchart and/or Gantt */}
               {(viewMode === "flowchart" || viewMode === "both") && (
-                <div className="border-b border-slate-800/70">
-                  <div className="px-5 pt-3 flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-400">
+                <div className="border-b border-slate-200/80">
+                  <div className="px-5 pt-3.5 pb-1 flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-500 font-medium">
                     <span>Interactive Stage Flowchart (Click any stage to update)</span>
-                    <span>
+                    <span className="text-indigo-600 font-semibold">
                       {feature.fourQuestions.where.percentComplete}% Lifecycle Complete
                     </span>
                   </div>
@@ -628,8 +628,8 @@ export function KeyzorDashboard({
 
               {(viewMode === "gantt" || viewMode === "both") && (
                 <div>
-                  <div className="px-5 pt-3 flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-400">
-                    <span>Gantt Schedule & Milestone Timeline</span>
+                  <div className="px-5 pt-3.5 pb-1 flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-500 font-medium">
+                    <span>Gantt Schedule &amp; Milestone Timeline</span>
                     <span>Target vs. Expected Date Tracking</span>
                   </div>
                   <FeatureGanttView
@@ -644,36 +644,36 @@ export function KeyzorDashboard({
 
         {/* Recent Agent & Architect Activity Feed */}
         {currentProject && currentProject.recentActivity.length > 0 && (
-          <section className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5">
+          <section className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
             <div className="flex items-center gap-2 mb-3">
-              <Activity className="w-4 h-4 text-sky-400" />
-              <h3 className="text-xs font-mono uppercase tracking-wider text-slate-300 font-semibold">
-                Recent AI Agent & Architect Updates
+              <Activity className="w-4 h-4 text-indigo-600" />
+              <h3 className="text-xs font-mono uppercase tracking-wider text-slate-800 font-bold">
+                Recent AI Agent &amp; Architect Updates
               </h3>
             </div>
             <div className="space-y-2">
               {currentProject.recentActivity.slice(0, 6).map((act) => (
                 <div
                   key={act.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3.5 py-2 rounded-lg bg-slate-950/60 border border-slate-800/70 text-xs"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3.5 py-2.5 rounded-lg bg-slate-50 border border-slate-200/80 text-xs"
                 >
                   <div className="flex items-center gap-2.5">
                     <span
-                      className={`px-2 py-0.5 rounded font-mono text-[10px] uppercase font-semibold ${
+                      className={`px-2 py-0.5 rounded font-mono text-[10px] uppercase font-bold ${
                         act.actorType === "agent"
-                          ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
-                          : "bg-sky-500/15 text-sky-300 border border-sky-500/30"
+                          ? "bg-purple-100 text-purple-700 border border-purple-200"
+                          : "bg-sky-100 text-sky-700 border border-sky-200"
                       }`}
                     >
                       {act.actorType === "agent" ? "AI Agent" : "Architect"}
                     </span>
-                    <span className="font-semibold text-slate-200">
+                    <span className="font-bold text-slate-800">
                       {act.actorName}:
                     </span>
-                    <span className="text-slate-300">{act.details}</span>
+                    <span className="text-slate-600">{act.details}</span>
                   </div>
                   <span
-                    className="text-[11px] font-mono text-slate-500 shrink-0"
+                    className="text-[11px] font-mono text-slate-400 shrink-0"
                     suppressHydrationWarning
                   >
                     {new Date(act.createdAt).toLocaleString()}
@@ -687,20 +687,20 @@ export function KeyzorDashboard({
 
       {/* MODAL 1: Stage & 4-Questions Quick Editor */}
       {editingFeature && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div>
-                <span className="text-[11px] font-mono uppercase text-sky-400">
-                  Manual Status & Stage Update
+                <span className="text-[11px] font-mono uppercase text-indigo-600 font-semibold">
+                  Manual Status &amp; Stage Update
                 </span>
-                <h3 className="text-lg font-bold text-white">
+                <h3 className="text-lg font-bold text-slate-900">
                   {editingFeature.title}
                 </h3>
               </div>
               <button
                 onClick={() => setEditingFeature(null)}
-                className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white"
+                className="p-1.5 rounded-lg bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200 transition"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -709,7 +709,7 @@ export function KeyzorDashboard({
             <form onSubmit={handleSaveFeatureUpdate} className="space-y-4">
               {/* 1. Where is this feature? */}
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-300 mb-1.5">
+                <label className="block text-xs font-mono uppercase text-slate-600 font-semibold mb-1.5">
                   1. Where is this feature? (Active Flowchart Stage)
                 </label>
                 <select
@@ -730,7 +730,7 @@ export function KeyzorDashboard({
                       );
                     }
                   }}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
                 >
                   {editingFeature.stages.map((s, i) => (
                     <option key={s.id} value={s.id}>
@@ -742,7 +742,7 @@ export function KeyzorDashboard({
 
               {/* 2. Who is working on it? */}
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-300 mb-1.5">
+                <label className="block text-xs font-mono uppercase text-slate-600 font-semibold mb-1.5">
                   2. Who is working on it? (Current Owner / Team / Agent)
                 </label>
                 <input
@@ -750,64 +750,64 @@ export function KeyzorDashboard({
                   value={editOwner}
                   onChange={(e) => setEditOwner(e.target.value)}
                   placeholder="e.g. India Dev Team, Lead Architect, Antigravity Agent"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
                 />
               </div>
 
               {/* 3 & 4: When do we want it done? / When do we expect it done? */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-300 mb-1.5">
+                  <label className="block text-xs font-mono uppercase text-slate-600 font-semibold mb-1.5">
                     3. When do we want it done?
                   </label>
                   <input
                     type="date"
                     value={editTargetDate}
                     onChange={(e) => setEditTargetDate(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-300 mb-1.5">
+                  <label className="block text-xs font-mono uppercase text-slate-600 font-semibold mb-1.5">
                     4. When do we expect it done?
                   </label>
                   <input
                     type="date"
                     value={editExpectedDate}
                     onChange={(e) => setEditExpectedDate(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
                   />
                 </div>
               </div>
 
               {/* Stage Gantt Dates & Status Notes */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-800">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200">
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">
+                  <label className="block text-xs font-mono text-slate-500 font-medium mb-1">
                     Stage Start Date (Gantt)
                   </label>
                   <input
                     type="date"
                     value={editStartDate}
                     onChange={(e) => setEditStartDate(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-mono text-slate-400 mb-1">
+                  <label className="block text-xs font-mono text-slate-500 font-medium mb-1">
                     Stage End Date (Gantt)
                   </label>
                   <input
                     type="date"
                     value={editEndDate}
                     onChange={(e) => setEditEndDate(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-mono text-slate-400 mb-1">
+                <label className="block text-xs font-mono text-slate-600 font-medium mb-1">
                   Stage Notes / Handoff Summary
                 </label>
                 <textarea
@@ -815,13 +815,13 @@ export function KeyzorDashboard({
                   value={editNotes}
                   onChange={(e) => setEditNotes(e.target.value)}
                   placeholder="e.g. Delivered design.md to dev team; prototype demo scheduled."
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
                 />
               </div>
 
               {/* Attach Resource Link (design.md, GitHub PR, Trello, Staging URL) */}
-              <div className="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 space-y-3">
-                <div className="text-xs font-mono uppercase text-sky-400">
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                <div className="text-xs font-mono uppercase text-indigo-600 font-bold">
                   + Attach Resource Link (design.md, GitHub PR, Staging URL, Trello)
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -830,19 +830,19 @@ export function KeyzorDashboard({
                     value={newLinkLabel}
                     onChange={(e) => setNewLinkLabel(e.target.value)}
                     placeholder="Label (e.g. design.md, PR #42)"
-                    className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                    className="bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                   <input
                     type="url"
                     value={newLinkUrl}
                     onChange={(e) => setNewLinkUrl(e.target.value)}
                     placeholder="https://github.com/..."
-                    className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                    className="bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                   <select
                     value={newLinkType}
                     onChange={(e) => setNewLinkType(e.target.value)}
-                    className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                    className="bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
                     <option value="design_doc">Architecture / design.md</option>
                     <option value="github">GitHub PR / Branch</option>
@@ -857,13 +857,13 @@ export function KeyzorDashboard({
                 <button
                   type="button"
                   onClick={() => setEditingFeature(null)}
-                  className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-300"
+                  className="px-4 py-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-700 shadow-2xs"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-semibold"
+                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs"
                 >
                   Save Status Update
                 </button>
@@ -875,44 +875,44 @@ export function KeyzorDashboard({
 
       {/* MODAL 2: Agent Onboarding & GET /hello Skill Modal */}
       {showAgentModal && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div>
-                <span className="text-[11px] font-mono uppercase text-emerald-400">
+                <span className="text-[11px] font-mono uppercase text-emerald-700 font-semibold">
                   Instructional Agent API • GET /hello
                 </span>
-                <h3 className="text-lg font-bold text-white">
+                <h3 className="text-lg font-bold text-slate-900">
                   Connect Your AI Coding Agent to KEYZOR
                 </h3>
               </div>
               <button
                 onClick={() => setShowAgentModal(false)}
-                className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white"
+                className="p-1.5 rounded-lg bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200 transition"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs text-slate-300 leading-relaxed">
+            <div className="space-y-3 text-xs text-slate-600 leading-relaxed">
               <p>
                 Copy the prompt below and send it to your coding agent (Antigravity, Claude Code, Cursor, etc.). The agent will call{" "}
-                <code className="text-sky-300 font-mono">{origin}/hello</code>, build its own local{" "}
-                <code className="text-emerald-300 font-mono">SKILL.md</code>, and proactively ask{" "}
-                <strong className="text-white">
+                <code className="text-indigo-600 font-mono font-semibold">{origin}/hello</code>, build its own local{" "}
+                <code className="text-emerald-700 font-mono font-semibold">SKILL.md</code>, and proactively ask{" "}
+                <strong className="text-slate-900">
                   &ldquo;Would you like to update the KEYZOR flowchart?&rdquo;
                 </strong>{" "}
                 whenever you brainstorm a feature, finish a <code className="font-mono">design.md</code>, demo a prototype, or open a PR.
               </p>
 
-              <div className="p-3.5 rounded-xl bg-slate-950 border border-emerald-500/40 space-y-2">
+              <div className="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-200 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-mono uppercase text-emerald-400 font-semibold">
+                  <span className="text-[11px] font-mono uppercase text-emerald-800 font-bold">
                     1-Click Agent Onboarding Prompt
                   </span>
                   <button
                     onClick={() => copyText(agentOnboardingPrompt, "agent-prompt")}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs transition"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-xs transition"
                   >
                     {copiedId === "agent-prompt" ? (
                       <>
@@ -925,17 +925,17 @@ export function KeyzorDashboard({
                     )}
                   </button>
                 </div>
-                <pre className="text-xs font-mono text-emerald-200 whitespace-pre-wrap break-all bg-slate-900/90 p-3 rounded-lg border border-slate-800">
+                <pre className="text-xs font-mono text-emerald-950 whitespace-pre-wrap break-all bg-white p-3 rounded-lg border border-emerald-200 shadow-2xs">
                   {agentOnboardingPrompt}
                 </pre>
               </div>
 
               {/* Generate Additional API Key */}
-              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-200">
-                  <KeyRound className="w-3.5 h-3.5 text-sky-400" />
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                  <KeyRound className="w-3.5 h-3.5 text-indigo-600" />
                   <span>Active Agent API Key:</span>
-                  <code className="text-sky-300 font-mono">{activeApiKey}</code>
+                  <code className="text-indigo-700 font-mono font-bold">{activeApiKey}</code>
                 </div>
                 <div className="flex gap-2">
                   <input
@@ -943,11 +943,11 @@ export function KeyzorDashboard({
                     value={newKeyLabel}
                     onChange={(e) => setNewKeyLabel(e.target.value)}
                     placeholder="New key label (e.g. India Dev Team Agent)"
-                    className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white"
+                    className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
                   />
                   <button
                     onClick={handleGenerateKey}
-                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200"
+                    className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-700 shadow-2xs"
                   >
                     Generate New Key
                   </button>
@@ -959,14 +959,14 @@ export function KeyzorDashboard({
                   href="/hello"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-sky-400 hover:underline text-xs font-mono"
+                  className="inline-flex items-center gap-1.5 text-indigo-600 hover:underline text-xs font-mono font-semibold"
                 >
                   Open /hello Interactive Endpoint Page{" "}
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
                 <button
                   onClick={() => setShowAgentModal(false)}
-                  className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-white"
+                  className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-xs font-semibold text-white shadow-xs"
                 >
                   Done
                 </button>
@@ -978,44 +978,44 @@ export function KeyzorDashboard({
 
       {/* MODAL 3: Encrypted Stakeholder Share Link Modal */}
       {showShareModal && currentProject && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-violet-400" />
+                <ShieldCheck className="w-5 h-5 text-purple-600" />
                 <div>
-                  <span className="text-[11px] font-mono uppercase text-violet-400">
+                  <span className="text-[11px] font-mono uppercase text-purple-700 font-bold">
                     AES-256-GCM Encrypted Stakeholder Link
                   </span>
-                  <h3 className="text-lg font-bold text-white">
-                    Read-Only Presentation & Stakeholder View
+                  <h3 className="text-lg font-bold text-slate-900">
+                    Read-Only Presentation &amp; Stakeholder View
                   </h3>
                 </div>
               </div>
               <button
                 onClick={() => setShowShareModal(false)}
-                className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white"
+                className="p-1.5 rounded-lg bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200 transition"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-300 leading-relaxed">
+            <p className="text-xs text-slate-600 leading-relaxed">
               Share this encrypted link with your CEO, client, or external dev leads so they can view the live{" "}
-              <strong className="text-white">Gantt Chart</strong>,{" "}
-              <strong className="text-white">Stage Flowchart</strong>, and{" "}
-              <strong className="text-white">4 Core Questions</strong> in read-only presentation mode without needing an account.
+              <strong className="text-slate-900">Gantt Chart</strong>,{" "}
+              <strong className="text-slate-900">Stage Flowchart</strong>, and{" "}
+              <strong className="text-slate-900">4 Core Questions</strong> in read-only presentation mode without needing an account.
             </p>
 
             {currentProject.shareEnabled ? (
-              <div className="p-3.5 rounded-xl bg-slate-950 border border-violet-500/40 space-y-2.5">
-                <div className="text-[11px] font-mono text-violet-300 flex items-center justify-between">
+              <div className="p-3.5 rounded-xl bg-purple-50/60 border border-purple-200 space-y-2.5">
+                <div className="text-[11px] font-mono text-purple-900 font-bold flex items-center justify-between">
                   <span>ENCRYPTED SHARE URL (ACTIVE)</span>
                   <a
                     href={shareUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-sky-400 hover:underline"
+                    className="inline-flex items-center gap-1 text-indigo-600 hover:underline font-semibold"
                   >
                     Preview Stakeholder View <ExternalLink className="w-3 h-3" />
                   </a>
@@ -1025,11 +1025,11 @@ export function KeyzorDashboard({
                     type="text"
                     readOnly
                     value={shareUrl}
-                    className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-slate-200"
+                    className="flex-1 bg-white border border-purple-200 rounded-lg px-3 py-2 text-xs font-mono text-slate-800 shadow-2xs"
                   />
                   <button
                     onClick={() => copyText(shareUrl, "share-url")}
-                    className="px-3.5 py-2 rounded-lg bg-violet-500 hover:bg-violet-400 text-slate-950 font-semibold text-xs inline-flex items-center gap-1.5 shrink-0"
+                    className="px-3.5 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs inline-flex items-center gap-1.5 shrink-0 shadow-xs"
                   >
                     {copiedId === "share-url" ? (
                       <>
@@ -1044,12 +1044,12 @@ export function KeyzorDashboard({
                 </div>
               </div>
             ) : (
-              <div className="p-4 rounded-xl bg-rose-950/30 border border-rose-500/40 text-xs text-rose-200">
+              <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 font-medium">
                 Read-only stakeholder sharing is currently disabled for this project. All encrypted links are blocked.
               </div>
             )}
 
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200">
               <div className="flex gap-2">
                 <button
                   onClick={() =>
@@ -1057,7 +1057,7 @@ export function KeyzorDashboard({
                       shareEnabled: !currentProject.shareEnabled,
                     })
                   }
-                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 border border-slate-700"
+                  className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 border border-slate-300 shadow-2xs"
                 >
                   {currentProject.shareEnabled
                     ? "Disable Share Link"
@@ -1065,15 +1065,15 @@ export function KeyzorDashboard({
                 </button>
                 <button
                   onClick={() => handleShareSettings({ rotateToken: true })}
-                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-amber-300 border border-slate-700"
+                  className="px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-xs font-semibold text-amber-800 border border-amber-300 shadow-2xs"
                   title="Generates a new AES-256-GCM encrypted link and immediately invalidates old links"
                 >
-                  Rotate & Revoke Old Link
+                  Rotate &amp; Revoke Old Link
                 </button>
               </div>
               <button
                 onClick={() => setShowShareModal(false)}
-                className="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-white"
+                className="px-4 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-700 shadow-2xs"
               >
                 Close
               </button>
@@ -1084,20 +1084,20 @@ export function KeyzorDashboard({
 
       {/* MODAL 4: Create New Feature Flowchart */}
       {showNewFeatureModal && currentProject && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div>
-                <span className="text-[11px] font-mono uppercase text-sky-400">
+                <span className="text-[11px] font-mono uppercase text-indigo-600 font-bold">
                   Brainstorming / New Flow
                 </span>
-                <h3 className="text-lg font-bold text-white">
+                <h3 className="text-lg font-bold text-slate-900">
                   Create Feature Flowchart in {currentProject.name}
                 </h3>
               </div>
               <button
                 onClick={() => setShowNewFeatureModal(false)}
-                className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white"
+                className="p-1.5 rounded-lg bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200 transition"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1105,7 +1105,7 @@ export function KeyzorDashboard({
 
             <form onSubmit={handleCreateFeature} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-300 mb-1">
+                <label className="block text-xs font-mono uppercase text-slate-600 font-semibold mb-1">
                   Feature / Mini-Project Title *
                 </label>
                 <input
@@ -1114,12 +1114,12 @@ export function KeyzorDashboard({
                   value={newFeatTitle}
                   onChange={(e) => setNewFeatTitle(e.target.value)}
                   placeholder="e.g. Multi-Region Failover Router"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-300 mb-1">
+                <label className="block text-xs font-mono uppercase text-slate-600 font-semibold mb-1">
                   Scope Summary
                 </label>
                 <textarea
@@ -1127,49 +1127,49 @@ export function KeyzorDashboard({
                   value={newFeatSummary}
                   onChange={(e) => setNewFeatSummary(e.target.value)}
                   placeholder="Brief description of what we're building..."
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-300 mb-1">
+                <label className="block text-xs font-mono uppercase text-slate-600 font-semibold mb-1">
                   Who is working on it? (Initial Owner)
                 </label>
                 <input
                   type="text"
                   value={newFeatOwner}
                   onChange={(e) => setNewFeatOwner(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-300 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-600 font-semibold mb-1">
                     When do we want it done?
                   </label>
                   <input
                     type="date"
                     value={newFeatTargetDate}
                     onChange={(e) => setNewFeatTargetDate(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-mono uppercase text-slate-300 mb-1">
+                  <label className="block text-xs font-mono uppercase text-slate-600 font-semibold mb-1">
                     When do we expect it done?
                   </label>
                   <input
                     type="date"
                     value={newFeatExpectedDate}
                     onChange={(e) => setNewFeatExpectedDate(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-mono text-slate-400 mb-1">
+                <label className="block text-xs font-mono text-slate-500 font-medium mb-1">
                   Custom Stages (Optional — comma-separated; leave blank for default 7-stage Architect Lifecycle)
                 </label>
                 <input
@@ -1177,7 +1177,7 @@ export function KeyzorDashboard({
                   value={newFeatCustomStages}
                   onChange={(e) => setNewFeatCustomStages(e.target.value)}
                   placeholder="Default: Brainstorming, design.md, Handed to Dev, Prototype Demo, Dev Deploy, Bugfixes, Prod"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200"
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
                 />
               </div>
 
@@ -1185,13 +1185,13 @@ export function KeyzorDashboard({
                 <button
                   type="button"
                   onClick={() => setShowNewFeatureModal(false)}
-                  className="px-4 py-2 rounded-lg bg-slate-800 text-xs text-slate-300"
+                  className="px-4 py-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-700 shadow-2xs"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-semibold"
+                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs"
                 >
                   Create Flowchart
                 </button>
@@ -1203,20 +1203,20 @@ export function KeyzorDashboard({
 
       {/* MODAL 5: Create New Project */}
       {showNewProjectModal && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-lg font-bold text-white">Create New Project</h3>
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 className="text-lg font-bold text-slate-900">Create New Project</h3>
               <button
                 onClick={() => setShowNewProjectModal(false)}
-                className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white"
+                className="p-1.5 rounded-lg bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200 transition"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
             <form onSubmit={handleCreateProject} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-300 mb-1">
+                <label className="block text-xs font-mono uppercase text-slate-600 font-semibold mb-1">
                   Project Name *
                 </label>
                 <input
@@ -1225,11 +1225,11 @@ export function KeyzorDashboard({
                   value={newProjName}
                   onChange={(e) => setNewProjName(e.target.value)}
                   placeholder="e.g. Mobile App v3 Rebuild"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
                 />
               </div>
               <div>
-                <label className="block text-xs font-mono uppercase text-slate-300 mb-1">
+                <label className="block text-xs font-mono uppercase text-slate-600 font-semibold mb-1">
                   Description
                 </label>
                 <textarea
@@ -1237,20 +1237,20 @@ export function KeyzorDashboard({
                   value={newProjDesc}
                   onChange={(e) => setNewProjDesc(e.target.value)}
                   placeholder="High-level architectural goals..."
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowNewProjectModal(false)}
-                  className="px-4 py-2 rounded-lg bg-slate-800 text-xs text-slate-300"
+                  className="px-4 py-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-700 shadow-2xs"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-semibold"
+                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs"
                 >
                   Create Project
                 </button>
