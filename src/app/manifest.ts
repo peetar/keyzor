@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "KAZOR — AI-Native Architect & Feature Flowchart Tracker",
-    short_name: "KAZOR",
+    name: "KEYZOR — AI-Native Architect & Feature Flowchart Tracker",
+    short_name: "KEYZOR",
     description:
       "AI-friendly feature lifecycle, Flowchart, and Gantt status dashboard for software architects and agentic developers.",
     start_url: "/",

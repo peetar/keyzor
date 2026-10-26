@@ -1,6 +1,6 @@
-# KAZOR — AI-Native Feature Flowchart & Gantt Status Tracker
+# KEYZOR — AI-Native Feature Flowchart & Gantt Status Tracker
 
-**KAZOR** is a minimalist, AI-first project and feature status dashboard built for **software architects and agentic developers** who wear multiple hats (CPO brainstorming with a client/CEO, Architect handing `design.md` to a dev team, Developer opening PRs and shipping fixes).
+**KEYZOR** is a minimalist, AI-first project and feature status dashboard built for **software architects and agentic developers** who wear multiple hats (CPO brainstorming with a client/CEO, Architect handing `design.md` to a dev team, Developer opening PRs and shipping fixes).
 
 ## Core Highlights
 
@@ -15,7 +15,7 @@
 3. **AES-256-GCM Encrypted Stakeholder Share Links (`/share/[token]`)**:
    - Share a live, read-only presentation view of your project's Gantt chart and Flowchart with clients, CEOs, or external dev leads—accessible only via an encrypted, rotatable share link.
 4. **Zero-Hassle Database & Free OAuth**:
-   - **Local Development**: Automatically runs an embedded PostgreSQL instance (`@electric-sql/pglite` in `.kazor-data`) pre-seeded with realistic architect & dev handoff flows—zero setup required.
+   - **Local Development**: Automatically runs an embedded PostgreSQL instance (`@electric-sql/pglite` in `.keyzor-data`) pre-seeded with realistic architect & dev handoff flows—zero setup required.
    - **Vercel Production**: Connect Vercel's free 1-click **Neon Serverless Postgres** (`DATABASE_URL`), plus optional free **GitHub / Google OAuth** (`AUTH_GITHUB_ID`, `AUTH_GITHUB_SECRET`).
 
 ## Quick Start

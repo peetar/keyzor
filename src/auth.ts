@@ -32,7 +32,7 @@ providers.push(
       email: {
         label: "Email",
         type: "email",
-        placeholder: "architect@kazor.app",
+        placeholder: "architect@keyzor.vercel.app",
       },
       role: {
         label: "Active Hat",
@@ -42,7 +42,7 @@ providers.push(
     },
     async authorize(credentials) {
       const email =
-        (credentials?.email as string)?.trim() || "architect@kazor.app";
+        (credentials?.email as string)?.trim() || "architect@keyzor.vercel.app";
       const name =
         (credentials?.role as string)?.trim() || "Lead Architect (CPO / Dev)";
       return {
@@ -58,7 +58,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true,
   secret:
     process.env.AUTH_SECRET ||
-    "kazor-dev-secret-key-change-in-production-32bytes",
+    "keyzor-dev-secret-key-change-in-production-32bytes",
   providers,
   session: {
     strategy: "jwt",

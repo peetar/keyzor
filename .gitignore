@@ -4,6 +4,7 @@
 .pnp.js
 
 # local database
+/.keyzor-data
 /.kazor-data
 
 # next.js

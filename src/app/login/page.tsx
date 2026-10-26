@@ -13,7 +13,7 @@ export default function LoginPage() {
             K
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">
-            Sign in to KAZOR
+            Sign in to KEYZOR
           </h1>
           <p className="text-xs text-slate-400">
             AI-Native Feature Flowchart &amp; Gantt Dashboard for Software Architects
@@ -29,7 +29,7 @@ export default function LoginPage() {
                 await signIn("github", { redirectTo: "/" });
               } else {
                 await signIn("credentials", {
-                  email: "github-architect@kazor.app",
+                  email: "github-architect@keyzor.vercel.app",
                   role: "Lead Architect (GitHub)",
                   redirectTo: "/",
                 });
@@ -55,7 +55,7 @@ export default function LoginPage() {
                 await signIn("google", { redirectTo: "/" });
               } else {
                 await signIn("credentials", {
-                  email: "google-architect@kazor.app",
+                  email: "google-architect@keyzor.vercel.app",
                   role: "Lead Architect (Google)",
                   redirectTo: "/",
                 });
@@ -88,7 +88,7 @@ export default function LoginPage() {
           action={async (formData: FormData) => {
             "use server";
             const email =
-              (formData.get("email") as string) || "architect@kazor.app";
+              (formData.get("email") as string) || "architect@keyzor.vercel.app";
             const role =
               (formData.get("role") as string) || "Lead Architect (CPO / Dev)";
             await signIn("credentials", {
@@ -106,7 +106,7 @@ export default function LoginPage() {
             <input
               name="email"
               type="email"
-              defaultValue="architect@kazor.app"
+              defaultValue="architect@keyzor.vercel.app"
               className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white"
             />
           </div>
@@ -139,7 +139,7 @@ export default function LoginPage() {
             type="submit"
             className="w-full py-2.5 px-4 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs flex items-center justify-center gap-1.5 transition"
           >
-            <span>Enter KAZOR Workspace</span>
+            <span>Enter KEYZOR Workspace</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </form>

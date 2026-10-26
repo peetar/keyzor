@@ -11,17 +11,17 @@ import { hashApiKey } from "@/lib/crypto";
 type DrizzleInstance = ReturnType<typeof drizzlePglite<typeof schema>>;
 
 const globalForDb = globalThis as unknown as {
-  __kazorPglite?: PGlite;
-  __kazorDb?: DrizzleInstance;
-  __kazorInitPromise?: Promise<void>;
+  __keyzorPglite?: PGlite;
+  __keyzorDb?: DrizzleInstance;
+  __keyzorInitPromise?: Promise<void>;
 };
 
 export const DEMO_API_KEY = "kz_live_demo_architect_2026";
 export const DEFAULT_USER_ID = "usr_architect_peter";
 
 function getOrCreateDbInstance(): DrizzleInstance {
-  if (globalForDb.__kazorDb) {
-    return globalForDb.__kazorDb;
+  if (globalForDb.__keyzorDb) {
+    return globalForDb.__keyzorDb;
   }
 
   const dbUrl = process.env.DATABASE_URL?.trim();
@@ -31,24 +31,24 @@ function getOrCreateDbInstance(): DrizzleInstance {
     (dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://"))
   ) {
     const client = neon(dbUrl);
-    globalForDb.__kazorDb = drizzleNeon(client, {
+    globalForDb.__keyzorDb = drizzleNeon(client, {
       schema,
     }) as unknown as DrizzleInstance;
-    return globalForDb.__kazorDb;
+    return globalForDb.__keyzorDb;
   }
 
-  if (!globalForDb.__kazorPglite) {
-    const dataDir = path.join(process.cwd(), ".kazor-data", "pgdata");
+  if (!globalForDb.__keyzorPglite) {
+    const dataDir = path.join(process.cwd(), ".keyzor-data", "pgdata");
     try {
       fs.mkdirSync(path.dirname(dataDir), { recursive: true });
-      globalForDb.__kazorPglite = new PGlite(dataDir);
+      globalForDb.__keyzorPglite = new PGlite(dataDir);
     } catch {
-      globalForDb.__kazorPglite = new PGlite();
+      globalForDb.__keyzorPglite = new PGlite();
     }
   }
 
-  globalForDb.__kazorDb = drizzlePglite(globalForDb.__kazorPglite, { schema });
-  return globalForDb.__kazorDb;
+  globalForDb.__keyzorDb = drizzlePglite(globalForDb.__keyzorPglite, { schema });
+  return globalForDb.__keyzorDb;
 }
 
 // Lazy proxy so importing `db` during Next.js static build analysis never opens PGlite prematurely
@@ -61,21 +61,21 @@ export const db: DrizzleInstance = new Proxy({} as DrizzleInstance, {
 });
 
 export async function ensureDatabaseReady(): Promise<void> {
-  if (globalForDb.__kazorInitPromise) {
-    return globalForDb.__kazorInitPromise;
+  if (globalForDb.__keyzorInitPromise) {
+    return globalForDb.__keyzorInitPromise;
   }
 
-  globalForDb.__kazorInitPromise = (async () => {
+  globalForDb.__keyzorInitPromise = (async () => {
     let activeDb = getOrCreateDbInstance();
     try {
       await activeDb.execute(sql`SELECT 1`);
     } catch {
-      // Recover if local .kazor-data had a stale lock from an interrupted build worker
-      globalForDb.__kazorPglite = new PGlite();
-      globalForDb.__kazorDb = drizzlePglite(globalForDb.__kazorPglite, {
+      // Recover if local .keyzor-data had a stale lock from an interrupted build worker
+      globalForDb.__keyzorPglite = new PGlite();
+      globalForDb.__keyzorDb = drizzlePglite(globalForDb.__keyzorPglite, {
         schema,
       });
-      activeDb = globalForDb.__kazorDb;
+      activeDb = globalForDb.__keyzorDb;
     }
     await activeDb.execute(sql`
       CREATE TABLE IF NOT EXISTS users (
@@ -188,13 +188,13 @@ export async function ensureDatabaseReady(): Promise<void> {
     }
   })();
 
-  return globalForDb.__kazorInitPromise;
+  return globalForDb.__keyzorInitPromise;
 }
 
 async function seedInitialWorkspace(activeDb: DrizzleInstance) {
   await activeDb.insert(schema.users).values({
     id: DEFAULT_USER_ID,
-    email: "architect@kazor.app",
+    email: "architect@keyzor.vercel.app",
     name: "Lead Architect (CPO / Dev)",
     provider: "credentials",
   });
@@ -429,7 +429,7 @@ async function seedInitialWorkspace(activeDb: DrizzleInstance) {
       plannedEndDate: "2026-10-24",
       actualStartDate: "2026-10-22",
       actualEndDate: "2026-10-25",
-      notes: "Live on staging-metering.kazor.internal.",
+      notes: "Live on staging-metering.keyzor.internal.",
     },
     {
       id: "stg_f2_6",

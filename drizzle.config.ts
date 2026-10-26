@@ -5,6 +5,6 @@ export default defineConfig({
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL || "./.kazor-data/pgdata",
+    url: process.env.DATABASE_URL || "./.keyzor-data/pgdata",
   },
 });

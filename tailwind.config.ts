@@ -9,7 +9,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        kazor: {
+        keyzor: {
           bg: "#090D16",
           panel: "#111827",
           border: "#1F2937",

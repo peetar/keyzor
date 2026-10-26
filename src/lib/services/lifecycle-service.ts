@@ -481,11 +481,11 @@ export async function createFeatureWithFlow(
           agentInstructions:
             cs.agentInstructions ||
             schema.DEFAULT_ARCHITECT_STAGES[i]?.agentInstructions ||
-            "Complete milestone deliverables and update KAZOR flowchart.",
+            "Complete milestone deliverables and update KEYZOR flowchart.",
           proactiveTrigger:
             cs.proactiveTrigger ||
             schema.DEFAULT_ARCHITECT_STAGES[i]?.proactiveTrigger ||
-            "When this milestone is reached, ask the user: 'Would you like to update the KAZOR flowchart?'",
+            "When this milestone is reached, ask the user: 'Would you like to update the KEYZOR flowchart?'",
         }))
       : project.defaultStages.map((ds) => ({
           ...ds,

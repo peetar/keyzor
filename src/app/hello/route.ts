@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { listProjects } from "@/lib/services/lifecycle-service";
 import { DEMO_API_KEY } from "@/db";
-import { generateKazorSkillMarkdown } from "@/lib/api/instructional-envelope";
+import { generateKeyzorSkillMarkdown } from "@/lib/api/instructional-envelope";
 
 function getBaseUrl(req: Request): string {
   const url = new URL(req.url);
@@ -19,7 +19,7 @@ export async function GET(req: Request) {
   const baseUrl = getBaseUrl(req);
   const projects = await listProjects();
   const apiKeyHint = url.searchParams.get("key") || DEMO_API_KEY;
-  const skillMarkdown = generateKazorSkillMarkdown(baseUrl, projects, apiKeyHint);
+  const skillMarkdown = generateKeyzorSkillMarkdown(baseUrl, projects, apiKeyHint);
 
   const isBrowserHtmlRequest =
     format === "html" ||
@@ -35,11 +35,11 @@ export async function GET(req: Request) {
   if (format === "json" || accept === "application/json") {
     return NextResponse.json(
       {
-        protocol: "KAZOR-Instructional-API/1.0",
+        protocol: "KEYZOR-Instructional-API/1.0",
         welcome:
-          "Welcome to KAZOR! This endpoint provides everything an AI coding agent needs to build a local KAZOR skill and track feature flowcharts.",
+          "Welcome to KEYZOR! This endpoint provides everything an AI coding agent needs to build a local KEYZOR skill and track feature flowcharts.",
         recommended_action_for_agent:
-          "Save the `skill_markdown` field below to `.agent/skills/kazor/SKILL.md` (or `.claude/skills/kazor/SKILL.md`), then query `GET /api/v1/projects`.",
+          "Save the `skill_markdown` field below to `.agent/skills/keyzor/SKILL.md` (or `.claude/skills/keyzor/SKILL.md`), then query `GET /api/v1/projects`.",
         four_core_questions: [
           "1. Where is this feature? (currentStageId / stageName)",
           "2. Who is working on it? (currentOwner)",
@@ -48,13 +48,13 @@ export async function GET(req: Request) {
         ],
         proactive_hats: {
           cpo_brainstorming:
-            "When brainstorming a new feature with a client/CEO, ask: 'Would you like me to create a new KAZOR flowchart for this feature?'",
+            "When brainstorming a new feature with a client/CEO, ask: 'Would you like me to create a new KEYZOR flowchart for this feature?'",
           architect_design_md:
-            "When finishing design.md for handoff to a dev team, ask: 'Would you like me to attach design.md and advance the KAZOR flowchart to Handed Over to Dev?'",
+            "When finishing design.md for handoff to a dev team, ask: 'Would you like me to attach design.md and advance the KEYZOR flowchart to Handed Over to Dev?'",
           prototype_demo:
-            "When a prototype is ready for demo or deployed to staging, ask: 'Would you like to update KAZOR and attach the preview URL?'",
+            "When a prototype is ready for demo or deployed to staging, ask: 'Would you like to update KEYZOR and attach the preview URL?'",
           developer_pr_bugfix:
-            "When opening a PR or completing bugfixes, ask: 'Would you like to update the KAZOR flowchart with this PR link?'",
+            "When opening a PR or completing bugfixes, ask: 'Would you like to update the KEYZOR flowchart with this PR link?'",
         },
         endpoints: {
           hello_skill_markdown: `${baseUrl}/hello?format=skill`,
@@ -73,7 +73,7 @@ export async function GET(req: Request) {
       },
       {
         headers: {
-          "X-Kazor-Protocol": "KAZOR-Instructional-API/1.0",
+          "X-Keyzor-Protocol": "KEYZOR-Instructional-API/1.0",
         },
       }
     );
@@ -84,7 +84,7 @@ export async function GET(req: Request) {
       status: 200,
       headers: {
         "Content-Type": "text/markdown; charset=utf-8",
-        "X-Kazor-Protocol": "KAZOR-Instructional-API/1.0",
+        "X-Keyzor-Protocol": "KEYZOR-Instructional-API/1.0",
       },
     });
   }
@@ -100,7 +100,7 @@ export async function GET(req: Request) {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>KAZOR /hello — Agent Skill & Instructional API</title>
+  <title>KEYZOR /hello — Agent Skill & Instructional API</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-[#090D16] text-slate-100 min-h-screen font-sans antialiased">
@@ -110,7 +110,7 @@ export async function GET(req: Request) {
         <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-mono mb-3">
           GET /hello • AUDIENCE-AWARE ENDPOINT
         </div>
-        <h1 class="text-3xl font-bold tracking-tight">KAZOR Instructional Agent Protocol</h1>
+        <h1 class="text-3xl font-bold tracking-tight">KEYZOR Instructional Agent Protocol</h1>
         <p class="text-slate-400 mt-1 text-sm">
           You are viewing the human-friendly browser view. When an AI coding agent fetches <code class="text-sky-300">${baseUrl}/hello</code>, it receives the raw <code class="text-emerald-300">SKILL.md</code> payload automatically.
         </p>
@@ -128,7 +128,7 @@ export async function GET(req: Request) {
         Paste this single instruction into Antigravity, Claude Code, Cursor, or Windsurf:
       </p>
       <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center bg-slate-950 border border-slate-800 rounded-lg p-3">
-        <code id="agent-prompt" class="text-xs text-emerald-300 font-mono flex-1">Fetch ${baseUrl}/hello?format=skill&key=${apiKeyHint} and save the returned instructions as your KAZOR skill (SKILL.md). Then show me the current status of our projects.</code>
+        <code id="agent-prompt" class="text-xs text-emerald-300 font-mono flex-1">Fetch ${baseUrl}/hello?format=skill&key=${apiKeyHint} and save the returned instructions as your KEYZOR skill (SKILL.md). Then show me the current status of our projects.</code>
         <button onclick="navigator.clipboard.writeText(document.getElementById('agent-prompt').innerText); this.innerText='Copied!'; setTimeout(()=>this.innerText='Copy Agent Prompt', 2000);" class="px-4 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs whitespace-nowrap transition">
           Copy Agent Prompt
         </button>
@@ -157,7 +157,7 @@ export async function GET(req: Request) {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      "X-Kazor-Protocol": "KAZOR-Instructional-API/1.0",
+      "X-Keyzor-Protocol": "KEYZOR-Instructional-API/1.0",
     },
   });
 }

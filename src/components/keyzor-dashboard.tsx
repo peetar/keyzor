@@ -32,19 +32,19 @@ import {
   Sparkles,
 } from "lucide-react";
 
-interface KazorDashboardProps {
+interface KeyzorDashboardProps {
   initialProjects: EnrichedProject[];
   defaultApiKey: string;
   userEmail: string;
   userName: string;
 }
 
-export function KazorDashboard({
+export function KeyzorDashboard({
   initialProjects,
   defaultApiKey,
   userEmail,
   userName,
-}: KazorDashboardProps) {
+}: KeyzorDashboardProps) {
   const [projects, setProjects] = useState<EnrichedProject[]>(initialProjects);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
     initialProjects[0]?.id || ""
@@ -312,7 +312,7 @@ export function KazorDashboard({
     ? `${origin}/share/${encodeURIComponent(currentProject.encryptedShareToken)}`
     : "";
 
-  const agentOnboardingPrompt = `Fetch ${origin}/hello?format=skill&key=${activeApiKey} and save the returned instructions as your KAZOR skill (SKILL.md). Whenever we brainstorm a new feature, finish a design.md, demo a prototype, or open a PR, ask me: "Would you like to update the KAZOR flowchart?"`;
+  const agentOnboardingPrompt = `Fetch ${origin}/hello?format=skill&key=${activeApiKey} and save the returned instructions as your KEYZOR skill (SKILL.md). Whenever we brainstorm a new feature, finish a design.md, demo a prototype, or open a PR, ask me: "Would you like to update the KEYZOR flowchart?"`;
 
   return (
     <div className="min-h-screen flex flex-col bg-[#090D16] text-slate-100">
@@ -328,7 +328,7 @@ export function KazorDashboard({
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-bold tracking-tight text-white">
-                    KAZOR
+                    KEYZOR
                   </span>
                   <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30">
                     AI-Native Flowchart
@@ -883,7 +883,7 @@ export function KazorDashboard({
                   Instructional Agent API • GET /hello
                 </span>
                 <h3 className="text-lg font-bold text-white">
-                  Connect Your AI Coding Agent to KAZOR
+                  Connect Your AI Coding Agent to KEYZOR
                 </h3>
               </div>
               <button
@@ -900,7 +900,7 @@ export function KazorDashboard({
                 <code className="text-sky-300 font-mono">{origin}/hello</code>, build its own local{" "}
                 <code className="text-emerald-300 font-mono">SKILL.md</code>, and proactively ask{" "}
                 <strong className="text-white">
-                  &ldquo;Would you like to update the KAZOR flowchart?&rdquo;
+                  &ldquo;Would you like to update the KEYZOR flowchart?&rdquo;
                 </strong>{" "}
                 whenever you brainstorm a feature, finish a <code className="font-mono">design.md</code>, demo a prototype, or open a PR.
               </p>

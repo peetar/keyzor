@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { EnrichedFeature, EnrichedProject } from "@/lib/services/lifecycle-service";
 
 export interface AgentGuidanceBlock {
-  protocol: "KAZOR-Instructional-API/1.0";
+  protocol: "KEYZOR-Instructional-API/1.0";
   headline: string;
   four_questions_snapshot?: {
     "1_where_is_this_feature": string;
@@ -48,7 +48,7 @@ export function buildFeatureGuidance(
       : `${Math.abs(q.scheduleVarianceDays)} days ahead of target`;
 
   return {
-    protocol: "KAZOR-Instructional-API/1.0",
+    protocol: "KEYZOR-Instructional-API/1.0",
     headline: actionHeadline,
     four_questions_snapshot: {
       "1_where_is_this_feature": `${q.where.stageName} (Stage ${q.where.stageIndex + 1} of ${q.where.totalStages} — ${q.where.percentComplete}% complete)`,
@@ -62,7 +62,7 @@ export function buildFeatureGuidance(
       "Complete the work for this stage, attach any relevant links (design.md, GitHub PR, staging URL), and advance when ready.",
     proactive_milestone_prompt_rule:
       currentStage?.proactiveTrigger ||
-      "Whenever a milestone is reached in the workspace (e.g., finishing design.md, opening a PR, deploying to staging), proactively ask the developer: 'Would you like to update the KAZOR flowchart?'",
+      "Whenever a milestone is reached in the workspace (e.g., finishing design.md, opening a PR, deploying to staging), proactively ask the developer: 'Would you like to update the KEYZOR flowchart?'",
     next_recommended_api_calls: [
       ...(nextStage
         ? [
@@ -135,7 +135,7 @@ export function formatFeatureMarkdownForAgent(
           .join("\n")
       : "- None attached yet";
 
-  return `# KAZOR Instructional Response: ${feature.title}
+  return `# KEYZOR Instructional Response: ${feature.title}
 > **Status**: ${guidance.headline}
 
 ## The 4 Core Status Questions
@@ -157,7 +157,7 @@ ${linksMd}
 ### Next Recommended API Call
 \`\`\`bash
 curl -X PATCH "${guidance.next_recommended_api_calls[0]?.endpoint}" \\
-  -H "Authorization: Bearer <YOUR_KAZOR_API_KEY>" \\
+  -H "Authorization: Bearer <YOUR_KEYZOR_API_KEY>" \\
   -H "Content-Type: application/json" \\
   -d '${JSON.stringify(guidance.next_recommended_api_calls[0]?.example_body, null, 2)}'
 \`\`\`
@@ -183,7 +183,7 @@ export function respondInstructional(
       status,
       headers: {
         "Content-Type": "text/markdown; charset=utf-8",
-        "X-Kazor-Protocol": "KAZOR-Instructional-API/1.0",
+        "X-Keyzor-Protocol": "KEYZOR-Instructional-API/1.0",
       },
     });
   }
@@ -197,13 +197,13 @@ export function respondInstructional(
     {
       status,
       headers: {
-        "X-Kazor-Protocol": "KAZOR-Instructional-API/1.0",
+        "X-Keyzor-Protocol": "KEYZOR-Instructional-API/1.0",
       },
     }
   );
 }
 
-export function generateKazorSkillMarkdown(
+export function generateKeyzorSkillMarkdown(
   baseUrl: string,
   projects: EnrichedProject[],
   sampleApiKeyHint: string
@@ -219,25 +219,25 @@ export function generateKazorSkillMarkdown(
       : "- No projects created yet. Create one via `POST /api/v1/projects`.";
 
   return `---
-name: kazor-project-tracker
-description: Proactively track feature flowcharts, Gantt timelines, stage handoffs (design.md, PRs, prototypes, staging deploys), and the 4 Core Status Questions in KAZOR. Activate whenever brainstorming new features, finishing architecture docs (design.md), handing work to dev teams, demoing prototypes, opening PRs, or deploying to test/prod.
+name: keyzor-project-tracker
+description: Proactively track feature flowcharts, Gantt timelines, stage handoffs (design.md, PRs, prototypes, staging deploys), and the 4 Core Status Questions in KEYZOR. Activate whenever brainstorming new features, finishing architecture docs (design.md), handing work to dev teams, demoing prototypes, opening PRs, or deploying to test/prod.
 ---
 
-# KAZOR — AI Agent Skill & Instructional API Guide
+# KEYZOR — AI Agent Skill & Instructional API Guide
 
-Welcome, Coding Agent! You have connected to **KAZOR** (\`${baseUrl}\`), an AI-native project & feature flowchart tracker built for software architects and agentic developers.
+Welcome, Coding Agent! You have connected to **KEYZOR** (\`${baseUrl}\`), an AI-native project & feature flowchart tracker built for software architects and agentic developers.
 
 ## 1. How to Install This Skill Locally
 Save this response (or the section between the \`---\` frontmatter and the end of this file) as a skill in your environment:
-- **Antigravity / Gemini**: \`.agent/skills/kazor/SKILL.md\`
-- **Claude Code**: \`.claude/skills/kazor/SKILL.md\`
-- **Cursor**: \`.cursor/rules/kazor.mdc\`
+- **Antigravity / Gemini**: \`.agent/skills/keyzor/SKILL.md\`
+- **Claude Code**: \`.claude/skills/keyzor/SKILL.md\`
+- **Cursor**: \`.cursor/rules/keyzor.mdc\`
 
 ---
 
 ## 2. Core Philosophy: The 4 Questions & Proactive Milestone Prompts
 
-KAZOR is intentionally **not** a bloated ticket tracker. It exists to answer **4 Core Questions** for every feature at a glance:
+KEYZOR is intentionally **not** a bloated ticket tracker. It exists to answer **4 Core Questions** for every feature at a glance:
 1. **Where is this feature?** (Current stage in the Flowchart / Gantt timeline)
 2. **Who is working on it?** (\`currentOwner\` — e.g. \`"CPO"\`, \`"Lead Architect"\`, \`"India Dev Team"\`, \`"Antigravity Agent"\`)
 3. **When do we want it done?** (\`targetDate\` in \`YYYY-MM-DD\`)
@@ -245,7 +245,7 @@ KAZOR is intentionally **not** a bloated ticket tracker. It exists to answer **4
 
 ### YOUR PROACTIVE BEHAVIOR RULE (CRITICAL)
 As you work with the developer across different hats, **proactively ask**:
-> **"Would you like me to update the KAZOR flowchart?"**
+> **"Would you like me to update the KEYZOR flowchart?"**
 
 Specifically watch for these 4 developer hats:
 1. **CPO / Brainstorming Hat**: When the user says a client/CEO requested a new feature or starts brainstorming scope → Offer to call \`POST ${baseUrl}/api/v1/projects/<projectSlug>/features\` to create a new feature flowchart.
@@ -257,7 +257,7 @@ Specifically watch for these 4 developer hats:
 
 ## 3. Authentication
 
-Pass the KAZOR API Key in the \`Authorization\` header on write calls (or all calls):
+Pass the KEYZOR API Key in the \`Authorization\` header on write calls (or all calls):
 \`\`\`http
 Authorization: Bearer ${sampleApiKeyHint}
 Content-Type: application/json
@@ -265,7 +265,7 @@ Content-Type: application/json
 
 ---
 
-## 4. Active Projects on This KAZOR Instance
+## 4. Active Projects on This KEYZOR Instance
 ${projectListMd}
 
 ---

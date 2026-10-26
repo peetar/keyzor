@@ -3,7 +3,7 @@ import crypto from "crypto";
 const SECRET_SOURCE =
   process.env.AUTH_SECRET ||
   process.env.NEXTAUTH_SECRET ||
-  "kazor-dev-secret-key-change-in-production-32bytes";
+  "keyzor-dev-secret-key-change-in-production-32bytes";
 
 function getAesKey(): Buffer {
   return crypto.createHash("sha256").update(SECRET_SOURCE).digest();

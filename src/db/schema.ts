@@ -21,7 +21,7 @@ export const DEFAULT_ARCHITECT_STAGES: StageTemplateItem[] = [
     agentInstructions:
       "Clarify the problem statement, user value, target completion date ('When we want it done'), and initial projected date ('When we expect it done').",
     proactiveTrigger:
-      "When the user finishes outlining a new feature idea or requirements conversation, ask: 'Would you like to update the KAZOR flowchart and lock in our target dates?'",
+      "When the user finishes outlining a new feature idea or requirements conversation, ask: 'Would you like to update the KEYZOR flowchart and lock in our target dates?'",
   },
   {
     name: "Architecture & design.md",
@@ -29,7 +29,7 @@ export const DEFAULT_ARCHITECT_STAGES: StageTemplateItem[] = [
     agentInstructions:
       "Draft and finalize the technical architecture or design.md document. Attach the repository or document link to this stage before handing over to dev.",
     proactiveTrigger:
-      "When a design.md, RFC, or technical specification file is created or finalized, ask: 'Would you like me to attach design.md and advance the KAZOR flowchart to Dev Handover?'",
+      "When a design.md, RFC, or technical specification file is created or finalized, ask: 'Would you like me to attach design.md and advance the KEYZOR flowchart to Dev Handover?'",
   },
   {
     name: "Handed Over to Dev",
@@ -37,7 +37,7 @@ export const DEFAULT_ARCHITECT_STAGES: StageTemplateItem[] = [
     agentInstructions:
       "Architecture and design.md have been delivered to the development team. Update 'currentOwner' to the assigned developer, team, or coding agent.",
     proactiveTrigger:
-      "When implementation work begins or a feature branch is created, ask: 'Should I update KAZOR to show Dev is actively building the prototype?'",
+      "When implementation work begins or a feature branch is created, ask: 'Should I update KEYZOR to show Dev is actively building the prototype?'",
   },
   {
     name: "Prototype Demo",
@@ -45,7 +45,7 @@ export const DEFAULT_ARCHITECT_STAGES: StageTemplateItem[] = [
     agentInstructions:
       "Build a functional prototype and demo it to the architect/stakeholders. Attach a PR link or demo recording/URL.",
     proactiveTrigger:
-      "When a working prototype is ready for demo or a draft PR is opened, ask: 'Would you like to update the KAZOR flowchart with the prototype link?'",
+      "When a working prototype is ready for demo or a draft PR is opened, ask: 'Would you like to update the KEYZOR flowchart with the prototype link?'",
   },
   {
     name: "Deployed on Dev/Test",
@@ -53,7 +53,7 @@ export const DEFAULT_ARCHITECT_STAGES: StageTemplateItem[] = [
     agentInstructions:
       "Deploy the feature to the staging/dev test server for integration testing and stakeholder review. Attach the preview/staging URL.",
     proactiveTrigger:
-      "When deployed to a staging/preview environment, ask: 'Would you like to log the test server URL and advance KAZOR to Deployed on Dev/Test?'",
+      "When deployed to a staging/preview environment, ask: 'Would you like to log the test server URL and advance KEYZOR to Deployed on Dev/Test?'",
   },
   {
     name: "Bugfixes & Feedback",
@@ -61,7 +61,7 @@ export const DEFAULT_ARCHITECT_STAGES: StageTemplateItem[] = [
     agentInstructions:
       "Iterate on feedback from the test server, resolve bugs, and refine expected completion date if scope shifted.",
     proactiveTrigger:
-      "When bugfix commits or review fixes are completed, ask: 'All feedback items look addressed—should we update KAZOR?'",
+      "When bugfix commits or review fixes are completed, ask: 'All feedback items look addressed—should we update KEYZOR?'",
   },
   {
     name: "Live in Production",
@@ -69,7 +69,7 @@ export const DEFAULT_ARCHITECT_STAGES: StageTemplateItem[] = [
     agentInstructions:
       "Feature is verified and live in production. Record final completion timestamp and production URL.",
     proactiveTrigger:
-      "When merged to main/production or released, ask: 'Congrats on shipping! Would you like to mark this feature Live in Production on KAZOR?'",
+      "When merged to main/production or released, ask: 'Congrats on shipping! Would you like to mark this feature Live in Production on KEYZOR?'",
   },
 ];
 

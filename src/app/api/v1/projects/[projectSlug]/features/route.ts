@@ -42,7 +42,7 @@ export async function GET(
       features: project.features,
     },
     {
-      protocol: "KAZOR-Instructional-API/1.0",
+      protocol: "KEYZOR-Instructional-API/1.0",
       headline: `Listed ${project.features.length} feature(s) in '${project.name}'.`,
       proactive_milestone_prompt_rule:
         "Check the 4 Core Questions for each feature ('where', 'who', 'whenWantDone', 'whenExpectDone'). Offer to advance stages or attach links as work progresses.",

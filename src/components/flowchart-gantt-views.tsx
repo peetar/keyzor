@@ -557,7 +557,7 @@ export function FeatureGanttView({
               <strong className="text-slate-200">Proactive Agent Skill Trigger:</strong>{" "}
               {feature.stages.find((s) => s.id === feature.currentStageId)
                 ?.proactiveTrigger ||
-                "Agent will ask 'Would you like to update the KAZOR flowchart?' when the current milestone finishes."}
+                "Agent will ask 'Would you like to update the KEYZOR flowchart?' when the current milestone finishes."}
             </span>
           </div>
           <span className="text-[11px] font-mono text-slate-500 shrink-0">

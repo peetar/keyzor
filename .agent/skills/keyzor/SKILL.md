@@ -1,14 +1,14 @@
 ---
-name: kazor-project-tracker
-description: Proactively track feature flowcharts, Gantt timelines, stage handoffs (design.md, PRs, prototypes, staging deploys), and the 4 Core Status Questions in KAZOR. Activate whenever brainstorming new features, finishing architecture docs (design.md), handing work to dev teams, demoing prototypes, opening PRs, or deploying to test/prod.
+name: keyzor-project-tracker
+description: Proactively track feature flowcharts, Gantt timelines, stage handoffs (design.md, PRs, prototypes, staging deploys), and the 4 Core Status Questions in KEYZOR. Activate whenever brainstorming new features, finishing architecture docs (design.md), handing work to dev teams, demoing prototypes, opening PRs, or deploying to test/prod.
 ---
 
-# KAZOR — Proactive AI Agent Skill
+# KEYZOR — Proactive AI Agent Skill
 
-You are equipped with the **KAZOR Skill**. KAZOR is an AI-native feature flowchart and Gantt status tracker built for software architects and agentic developers.
+You are equipped with the **KEYZOR Skill**. KEYZOR is an AI-native feature flowchart and Gantt status tracker built for software architects and agentic developers.
 
 ## 1. The 4 Core Status Questions
-Every feature in KAZOR tracks:
+Every feature in KEYZOR tracks:
 1. **Where is this feature?** (`currentStageId` / `stageName`)
 2. **Who is working on it?** (`currentOwner` — e.g. `"CPO"`, `"Lead Architect"`, `"India Dev Team"`, `"Antigravity Agent"`)
 3. **When do we want it done?** (`targetDate` in `YYYY-MM-DD`)
@@ -16,7 +16,7 @@ Every feature in KAZOR tracks:
 
 ## 2. Proactive Milestone Rule (CRITICAL)
 Whenever you and the developer reach a natural milestone across any of their hats, **proactively ask**:
-> **"Would you like me to update the KAZOR flowchart?"**
+> **"Would you like me to update the KEYZOR flowchart?"**
 
 Watch for these 4 developer hats:
 - **CPO / Brainstorming Hat**: When brainstorming a new feature requested by a client/CEO → Offer to call `POST /api/v1/projects/<projectSlug>/features` to create a new feature flowchart.

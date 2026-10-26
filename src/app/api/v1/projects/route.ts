@@ -40,10 +40,10 @@ export async function GET(req: Request) {
       })),
     },
     {
-      protocol: "KAZOR-Instructional-API/1.0",
+      protocol: "KEYZOR-Instructional-API/1.0",
       headline: `Loaded ${projects.length} project(s).`,
       proactive_milestone_prompt_rule:
-        "When the user starts brainstorming a new feature with a client/CEO or begins a mini-project/bugfix, ask: 'Would you like to create a KAZOR flowchart for this feature?'",
+        "When the user starts brainstorming a new feature with a client/CEO or begins a mini-project/bugfix, ask: 'Would you like to create a KEYZOR flowchart for this feature?'",
       next_recommended_api_calls: [
         {
           when_to_call: "To create a new feature flowchart during brainstorming",
@@ -88,7 +88,7 @@ export async function POST(req: Request) {
       req,
       { project },
       {
-        protocol: "KAZOR-Instructional-API/1.0",
+        protocol: "KEYZOR-Instructional-API/1.0",
         headline: `Created project '${project.name}' (slug: '${project.slug}').`,
         proactive_milestone_prompt_rule:
           "Now that the project is created, offer to initialize the first feature flowchart as you brainstorm with the user.",

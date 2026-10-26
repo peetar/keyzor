@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "KAZOR — AI-Native Feature Flowchart & Gantt Status Tracker",
+  title: "KEYZOR — AI-Native Feature Flowchart & Gantt Status Tracker",
   description:
     "Lightweight feature status dashboard and Instructional Agent API for software architects and agentic developers.",
   icons: {

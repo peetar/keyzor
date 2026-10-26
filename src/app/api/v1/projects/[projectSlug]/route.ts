@@ -31,7 +31,7 @@ export async function GET(
     req,
     { project },
     {
-      protocol: "KAZOR-Instructional-API/1.0",
+      protocol: "KEYZOR-Instructional-API/1.0",
       headline: `Project '${project.name}' has ${project.features.length} feature(s).`,
       proactive_milestone_prompt_rule:
         "Ask the user if they want to update any feature's stage, owner, or expected completion date when a milestone is reached.",
