@@ -246,15 +246,37 @@ KEYZOR is intentionally **not** a bloated ticket tracker. It exists to answer **
 3. **When do we want it done?** (\`targetDate\` in \`YYYY-MM-DD\`)
 4. **When do we expect it to be done?** (\`expectedDate\` in \`YYYY-MM-DD\`)
 
-### YOUR PROACTIVE BEHAVIOR RULE (CRITICAL)
-As you work with the developer across different hats, **proactively ask**:
+### YOUR PROACTIVE BEHAVIOR RULES (MANDATORY OPERATIONAL PROTOCOL)
+
+Whenever a milestone, design handoff, deploy, or scope shift occurs, **proactively ask**:
 > **"Would you like me to update the KEYZOR flowchart?"**
 
-Specifically watch for these 4 developer hats:
-1. **CPO / Brainstorming Hat**: When the user says a client/CEO requested a new feature or starts brainstorming scope → Offer to call \`POST ${baseUrl}/api/v1/projects/<projectSlug>/features\` to create a new feature flowchart.
-2. **Designer / Architect Hat**: When you finish writing or updating a \`design.md\` or technical spec for handoff to a dev team → Offer to attach the \`design.md\` link, advance the stage to \`Handed Over to Dev\`, and update \`currentOwner\` (e.g., \`"India Dev Team"\`).
-3. **Prototype / Demo Hat**: When a prototype is built or demoed → Offer to update the \`Prototype Demo\` or \`Deployed on Dev/Test\` stage and attach the preview URL.
-4. **Developer / PR / Bugfix Hat**: When opening a PR, fixing review bugs, or shipping to production → Offer to attach the GitHub PR link, update \`expectedDate\`, or mark the feature complete.
+Follow these 5 specific operational triggers:
+
+1. **Design / Plan / Spec Handoff Trigger (CRITICAL)**:
+   - **When**: Whenever you or the user create, edit, or finalize any design doc, architecture specification, RFC, or implementation plan (e.g., \`design.md\`, \`architecture.md\`, \`plan.md\`, \`implementation_plan.md\`, \`spec.md\`, OpenAPI contract).
+   - **Action**: Proactively ask:
+     > *"I see we just created/updated \`[filename]\`. Would you like me to attach this design doc link to KEYZOR and advance the flowchart to 'Architecture & design.md' (or 'Handed Over to Dev')?"*
+
+2. **Git Push & Deployment Completion Hook (CRITICAL)**:
+   - **When**: Before or immediately after executing \`git push\`, opening a PR (\`gh pr create\`), or running a deployment command (\`vercel --prod\`, \`npm run deploy\`, Docker release).
+   - **Action**: Proactively check active KEYZOR features and ask:
+     > *"We just pushed/deployed changes. Would you like me to advance [Active Feature Name] to 'Deployed on Dev/Test' or 'Live in Production'?"*
+
+3. **Scope Pivot & Side-Quest Reconciliation**:
+   - **When**: When the user requests bugfixes, ad-hoc cleanup, or starts working on tangential tasks while an active feature is in-progress in KEYZOR.
+   - **Action**: Prevent context drift by asking:
+     > *"Should we bundle this cleanup into [Active Feature Name], or track it as a new feature flowchart in KEYZOR?"*
+
+4. **CPO / Brainstorming Trigger**:
+   - **When**: When the user outlines a new feature request or brainstorms scope.
+   - **Action**: Ask:
+     > *"Would you like me to create a new KEYZOR flowchart for this feature so we can lock in target dates and lifecycle stages?"*
+
+5. **Prototype & Demo Trigger**:
+   - **When**: A working prototype is running locally, a preview environment is live, or a demo is scheduled.
+   - **Action**: Ask:
+     > *"Would you like me to update the 'Prototype Demo' stage in KEYZOR and attach the preview link?"*
 
 ---
 
