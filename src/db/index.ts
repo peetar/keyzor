@@ -185,6 +185,14 @@ export async function ensureDatabaseReady(): Promise<void> {
     if (existingUsers.length === 0) {
       await seedInitialWorkspace(activeDb);
     }
+
+    // Auto-prune legacy demo seed data from existing databases
+    await activeDb
+      .delete(schema.projects)
+      .where(eq(schema.projects.slug, "enterprise-cloud-v2"));
+    await activeDb
+      .delete(schema.apiKeys)
+      .where(sql`key_prefix LIKE 'kz_live_demo%' OR id = 'key_default_agent'`);
   })();
 
   return globalForDb.__keyzorInitPromise;
