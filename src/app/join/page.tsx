@@ -88,25 +88,18 @@ export default async function JoinProjectPage(props: {
                 action={async () => {
                   "use server";
                   const returnUrl = code ? `/join?code=${code}` : "/";
-                  if (oauthStatus.githubConfigured) {
-                    await signIn("github", { redirectTo: returnUrl });
-                  } else {
-                    await signIn("credentials", {
-                      email: "github-architect@keyzor.vercel.app",
-                      role: "Lead Architect (GitHub)",
-                      redirectTo: returnUrl,
-                    });
-                  }
+                  await signIn("github", { redirectTo: returnUrl });
                 }}
               >
                 <button
                   type="submit"
-                  className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-xs font-semibold text-white flex items-center justify-center gap-2 shadow-xs transition"
+                  disabled={!oauthStatus.githubConfigured}
+                  className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-semibold text-white flex items-center justify-center gap-2 shadow-xs transition"
                 >
                   <Github className="w-4 h-4" />
                   <span>
-                    Continue with GitHub{" "}
-                    {!oauthStatus.githubConfigured && "(Instant Local Mode)"}
+                    Continue with GitHub
+                    {!oauthStatus.githubConfigured && " (Not Configured)"}
                   </span>
                 </button>
               </form>
@@ -115,25 +108,18 @@ export default async function JoinProjectPage(props: {
                 action={async () => {
                   "use server";
                   const returnUrl = code ? `/join?code=${code}` : "/";
-                  if (oauthStatus.googleConfigured) {
-                    await signIn("google", { redirectTo: returnUrl });
-                  } else {
-                    await signIn("credentials", {
-                      email: "google-architect@keyzor.vercel.app",
-                      role: "Lead Architect (Google)",
-                      redirectTo: returnUrl,
-                    });
-                  }
+                  await signIn("google", { redirectTo: returnUrl });
                 }}
               >
                 <button
                   type="submit"
-                  className="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-700 flex items-center justify-center gap-2 shadow-xs transition"
+                  disabled={!oauthStatus.googleConfigured}
+                  className="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed border border-slate-300 text-xs font-semibold text-slate-700 flex items-center justify-center gap-2 shadow-xs transition"
                 >
                   <Globe className="w-4 h-4 text-indigo-600" />
                   <span>
-                    Continue with Google{" "}
-                    {!oauthStatus.googleConfigured && "(Instant Local Mode)"}
+                    Continue with Google
+                    {!oauthStatus.googleConfigured && " (Not Configured)"}
                   </span>
                 </button>
               </form>

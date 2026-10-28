@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import {
+  getFeatureByIdOrSlug,
+  getProjectPermission,
   updateFeatureStatus,
-  authenticateAgentRequest,
 } from "@/lib/services/lifecycle-service";
 import {
   buildFeatureGuidance,
   formatFeatureMarkdownForAgent,
   respondInstructional,
 } from "@/lib/api/instructional-envelope";
+import { resolveCaller } from "@/lib/api/auth-helper";
 
 function getBaseUrl(req: Request): string {
   const url = new URL(req.url);
@@ -21,8 +23,32 @@ async function handleStatusUpdate(
   context: { params: Promise<{ featureId: string }> }
 ) {
   try {
+    const caller = await resolveCaller(req);
+    if (!caller) {
+      return NextResponse.json(
+        { ok: false, error: "Authentication required. Please sign in or provide a valid Bearer API key." },
+        { status: 401 }
+      );
+    }
+
     const { featureId } = await context.params;
-    const auth = await authenticateAgentRequest(req.headers.get("authorization"));
+    const feature = await getFeatureByIdOrSlug(featureId);
+
+    if (!feature) {
+      return NextResponse.json(
+        { ok: false, error: `Feature '${featureId}' not found.` },
+        { status: 404 }
+      );
+    }
+
+    const perm = await getProjectPermission(feature.projectId, caller.userId);
+    if (!perm.hasAccess) {
+      return NextResponse.json(
+        { ok: false, error: "Access denied to the project containing this feature." },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
 
     const updated = await updateFeatureStatus({
@@ -43,8 +69,8 @@ async function handleStatusUpdate(
       actualStartDate: body.actualStartDate,
       actualEndDate: body.actualEndDate,
       links: body.links,
-      actorName: body.actorName || (auth.valid ? auth.keyName : "Architect"),
-      actorType: body.actorType || (auth.valid ? "agent" : "human"),
+      actorName: body.actorName || caller.name || (caller.authType === "api_key" ? "Agent" : "Architect"),
+      actorType: body.actorType || (caller.authType === "api_key" ? "agent" : "human"),
     });
 
     const baseUrl = getBaseUrl(req);

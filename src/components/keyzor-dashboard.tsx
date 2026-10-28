@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { signOutAction } from "@/app/actions/auth-actions";
 import type {
   EnrichedProject,
   EnrichedFeature,
@@ -622,13 +623,16 @@ export function KeyzorDashboard({
               <span className="truncate max-w-[140px] font-medium" title={userEmail}>
                 {userName}
               </span>
-              <a
-                href="/login"
+              <button
+                type="button"
+                onClick={async () => {
+                  await signOutAction();
+                }}
                 className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition"
-                title="Switch Hat / Account"
+                title="Sign Out"
               >
                 <LogOut className="w-3.5 h-3.5" />
-              </a>
+              </button>
             </div>
           </div>
         </div>

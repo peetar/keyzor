@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { listProjects } from "@/lib/services/lifecycle-service";
+import {
+  listProjects,
+  authenticateAgentRequest,
+} from "@/lib/services/lifecycle-service";
 import {
   generateKeyzorSkillMarkdown,
   generateSetupInstructionsMarkdown,
@@ -23,7 +26,6 @@ export async function GET(req: Request) {
   const userAgent = (req.headers.get("user-agent") || "").toLowerCase();
 
   const baseUrl = getBaseUrl(req);
-  const projects = await listProjects();
   const apiKey = url.searchParams.get("key")?.trim() || "";
 
   const isBrowserHtmlRequest =
@@ -147,7 +149,25 @@ export async function GET(req: Request) {
     });
   }
 
-  // Key was provided: generate personalized skill markdown
+  // Key was provided: validate key and fetch only the authenticated user's projects
+  const agentAuth = await authenticateAgentRequest("Bearer " + apiKey);
+  if (!agentAuth.valid || !agentAuth.userId) {
+    if (format === "json" || accept === "application/json") {
+      return NextResponse.json(
+        { ok: false, error: "Invalid or expired API key. Please generate a valid key from your KEYZOR dashboard." },
+        { status: 401 }
+      );
+    }
+    return new NextResponse(
+      "Error 401: Invalid or expired API key. Please generate a valid key from your KEYZOR dashboard.",
+      {
+        status: 401,
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      }
+    );
+  }
+
+  const projects = await listProjects(agentAuth.userId);
   const skillMarkdown = generateKeyzorSkillMarkdown(baseUrl, projects, apiKey);
 
   if (format === "json" || accept === "application/json") {

@@ -1,31 +1,20 @@
 import { NextResponse } from "next/server";
-import {
-  reviewProjectAccessRequest,
-  authenticateAgentRequest,
-} from "@/lib/services/lifecycle-service";
-import { auth } from "@/auth";
-import { DEFAULT_USER_ID } from "@/db";
-
-async function resolveCaller(req: Request): Promise<{ id: string }> {
-  const authHeader = req.headers.get("authorization");
-  if (authHeader) {
-    const agentAuth = await authenticateAgentRequest(authHeader);
-    if (agentAuth.valid && agentAuth.userId) {
-      return { id: agentAuth.userId };
-    }
-  }
-  const session = await auth();
-  if (session?.user?.id) {
-    return { id: session.user.id };
-  }
-  return { id: DEFAULT_USER_ID };
-}
+import { reviewProjectAccessRequest } from "@/lib/services/lifecycle-service";
+import { resolveCaller } from "@/lib/api/auth-helper";
 
 export async function PATCH(
   req: Request,
   context: { params: Promise<{ projectSlug: string; requestId: string }> }
 ) {
   try {
+    const caller = await resolveCaller(req);
+    if (!caller) {
+      return NextResponse.json(
+        { ok: false, error: "Authentication required. Please sign in or provide a valid Bearer API key." },
+        { status: 401 }
+      );
+    }
+
     const { requestId } = await context.params;
     const body = await req.json();
     const action = body.status as "approved" | "rejected";
@@ -37,11 +26,10 @@ export async function PATCH(
       );
     }
 
-    const caller = await resolveCaller(req);
     const result = await reviewProjectAccessRequest(
       requestId,
       action,
-      caller.id
+      caller.userId
     );
 
     return NextResponse.json({

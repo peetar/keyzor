@@ -1,8 +1,6 @@
 import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
 import Google from "next-auth/providers/google";
-import Credentials from "next-auth/providers/credentials";
-import { DEFAULT_USER_ID } from "@/db";
 import { getOrCreateUser } from "@/lib/services/lifecycle-service";
 
 const providers = [];
@@ -26,35 +24,6 @@ if (process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET) {
   );
 }
 
-providers.push(
-  Credentials({
-    name: "Architect Quick Login",
-    credentials: {
-      email: {
-        label: "Email",
-        type: "email",
-        placeholder: "architect@keyzor.vercel.app",
-      },
-      role: {
-        label: "Active Hat",
-        type: "text",
-        placeholder: "Lead Architect (CPO / Designer / Dev)",
-      },
-    },
-    async authorize(credentials) {
-      const email =
-        (credentials?.email as string)?.trim() || "architect@keyzor.vercel.app";
-      const name =
-        (credentials?.role as string)?.trim() || "Lead Architect (CPO / Dev)";
-      return {
-        id: DEFAULT_USER_ID,
-        email,
-        name,
-      };
-    },
-  })
-);
-
 export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true,
   secret:
@@ -72,7 +41,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             email: user.email,
             name: user.name,
             image: user.image,
-            provider: account?.provider || "credentials",
+            provider: account?.provider || "oauth",
           });
           token.userId = dbUser.id;
         } catch (e) {

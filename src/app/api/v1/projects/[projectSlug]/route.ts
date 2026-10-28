@@ -5,11 +5,9 @@ import {
   renameProject,
   deleteProject,
   getProjectPermission,
-  authenticateAgentRequest,
 } from "@/lib/services/lifecycle-service";
 import { respondInstructional } from "@/lib/api/instructional-envelope";
-import { auth } from "@/auth";
-import { DEFAULT_USER_ID } from "@/db";
+import { resolveCaller } from "@/lib/api/auth-helper";
 
 function getBaseUrl(req: Request): string {
   const url = new URL(req.url);
@@ -18,32 +16,24 @@ function getBaseUrl(req: Request): string {
   return `${proto}://${host}`;
 }
 
-async function resolveCaller(req: Request): Promise<{ userId: string }> {
-  const authHeader = req.headers.get("authorization");
-  if (authHeader) {
-    const agentAuth = await authenticateAgentRequest(authHeader);
-    if (agentAuth.valid && agentAuth.userId) {
-      return { userId: agentAuth.userId };
-    }
-  }
-  const session = await auth();
-  if (session?.user?.id) {
-    return { userId: session.user.id };
-  }
-  return { userId: DEFAULT_USER_ID };
-}
-
 export async function GET(
   req: Request,
   context: { params: Promise<{ projectSlug: string }> }
 ) {
-  const { projectSlug } = await context.params;
   const caller = await resolveCaller(req);
+  if (!caller) {
+    return NextResponse.json(
+      { ok: false, error: "Authentication required. Please sign in or provide a valid Bearer API key." },
+      { status: 401 }
+    );
+  }
+
+  const { projectSlug } = await context.params;
   const project = await getProjectByIdOrSlug(projectSlug, caller.userId);
 
   if (!project) {
     return NextResponse.json(
-      { ok: false, error: `Project '${projectSlug}' not found.` },
+      { ok: false, error: `Project '${projectSlug}' not found or access denied.` },
       { status: 404 }
     );
   }
@@ -80,9 +70,16 @@ export async function PATCH(
   context: { params: Promise<{ projectSlug: string }> }
 ) {
   try {
+    const caller = await resolveCaller(req);
+    if (!caller) {
+      return NextResponse.json(
+        { ok: false, error: "Authentication required. Please sign in or provide a valid Bearer API key." },
+        { status: 401 }
+      );
+    }
+
     const { projectSlug } = await context.params;
     const body = await req.json();
-    const caller = await resolveCaller(req);
 
     // If request contains "name", user is renaming the project (Owner only)
     if (typeof body.name === "string" && body.name.trim()) {
@@ -92,6 +89,12 @@ export async function PATCH(
 
     // Share settings update (Owner only)
     const perm = await getProjectPermission(projectSlug, caller.userId);
+    if (!perm.project) {
+      return NextResponse.json(
+        { ok: false, error: `Project '${projectSlug}' not found.` },
+        { status: 404 }
+      );
+    }
     if (perm.role !== "owner") {
       return NextResponse.json(
         { ok: false, error: "Only the project owner can update project settings." },
@@ -125,8 +128,15 @@ export async function DELETE(
   context: { params: Promise<{ projectSlug: string }> }
 ) {
   try {
-    const { projectSlug } = await context.params;
     const caller = await resolveCaller(req);
+    if (!caller) {
+      return NextResponse.json(
+        { ok: false, error: "Authentication required. Please sign in or provide a valid Bearer API key." },
+        { status: 401 }
+      );
+    }
+
+    const { projectSlug } = await context.params;
     const result = await deleteProject(projectSlug, caller.userId);
     return NextResponse.json({ ok: true, data: result });
   } catch (err) {

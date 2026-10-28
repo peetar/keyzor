@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import {
   getProjectByIdOrSlug,
+  getProjectPermission,
   createFeatureWithFlow,
-  authenticateAgentRequest,
 } from "@/lib/services/lifecycle-service";
 import {
   buildFeatureGuidance,
   formatFeatureMarkdownForAgent,
   respondInstructional,
 } from "@/lib/api/instructional-envelope";
+import { resolveCaller } from "@/lib/api/auth-helper";
 
 function getBaseUrl(req: Request): string {
   const url = new URL(req.url);
@@ -21,8 +22,30 @@ export async function GET(
   req: Request,
   context: { params: Promise<{ projectSlug: string }> }
 ) {
+  const caller = await resolveCaller(req);
+  if (!caller) {
+    return NextResponse.json(
+      { ok: false, error: "Authentication required. Please sign in or provide a valid Bearer API key." },
+      { status: 401 }
+    );
+  }
+
   const { projectSlug } = await context.params;
-  const project = await getProjectByIdOrSlug(projectSlug);
+  const perm = await getProjectPermission(projectSlug, caller.userId);
+  if (!perm.project) {
+    return NextResponse.json(
+      { ok: false, error: `Project '${projectSlug}' not found.` },
+      { status: 404 }
+    );
+  }
+  if (!perm.hasAccess) {
+    return NextResponse.json(
+      { ok: false, error: `Access denied to project '${projectSlug}'.` },
+      { status: 403 }
+    );
+  }
+
+  const project = await getProjectByIdOrSlug(projectSlug, caller.userId);
   if (!project) {
     return NextResponse.json(
       { ok: false, error: `Project '${projectSlug}' not found.` },
@@ -50,7 +73,7 @@ export async function GET(
         {
           when_to_call: "To advance a feature stage or attach a link (design.md, PR, staging URL)",
           method: "PATCH",
-          endpoint: `${baseUrl}/api/v1/features/${project.features[0]?.slug || "enterprise-sso-saml"}/status`,
+          endpoint: `${baseUrl}/api/v1/features/${project.features[0]?.slug || "feature-slug"}/status`,
           example_body: {
             action: "advance",
             currentOwner: "India Dev Team",
@@ -74,8 +97,29 @@ export async function POST(
   context: { params: Promise<{ projectSlug: string }> }
 ) {
   try {
+    const caller = await resolveCaller(req);
+    if (!caller) {
+      return NextResponse.json(
+        { ok: false, error: "Authentication required. Please sign in or provide a valid Bearer API key." },
+        { status: 401 }
+      );
+    }
+
     const { projectSlug } = await context.params;
-    const auth = await authenticateAgentRequest(req.headers.get("authorization"));
+    const perm = await getProjectPermission(projectSlug, caller.userId);
+    if (!perm.project) {
+      return NextResponse.json(
+        { ok: false, error: `Project '${projectSlug}' not found.` },
+        { status: 404 }
+      );
+    }
+    if (!perm.hasAccess) {
+      return NextResponse.json(
+        { ok: false, error: `Access denied to project '${projectSlug}'.` },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
 
     if (!body.title || typeof body.title !== "string") {
@@ -101,8 +145,8 @@ export async function POST(
       initialStageName: body.initialStageName,
       customStages: body.customStages,
       links: body.links,
-      actorName: body.actorName || (auth.valid ? auth.keyName : "Architect"),
-      actorType: body.actorType || (auth.valid ? "agent" : "human"),
+      actorName: body.actorName || caller.name || (caller.authType === "api_key" ? "Agent" : "Architect"),
+      actorType: body.actorType || (caller.authType === "api_key" ? "agent" : "human"),
     });
 
     const baseUrl = getBaseUrl(req);

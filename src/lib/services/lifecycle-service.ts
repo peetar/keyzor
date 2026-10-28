@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { eq, asc, desc, and, inArray, sql } from "drizzle-orm";
-import { db, ensureDatabaseReady, DEFAULT_USER_ID } from "@/db";
+import { db, ensureDatabaseReady } from "@/db";
 import * as schema from "@/db/schema";
 import {
   createEncryptedShareToken,
@@ -196,40 +196,37 @@ function generateInviteCode(): string {
 
 export async function listProjects(forUserId?: string): Promise<EnrichedProject[]> {
   await ensureDatabaseReady();
+  if (!forUserId) {
+    return [];
+  }
+
   let allProjects: Array<typeof schema.projects.$inferSelect> = [];
 
-  if (forUserId) {
-    const owned = await db
+  const owned = await db
+    .select()
+    .from(schema.projects)
+    .where(eq(schema.projects.ownerId, forUserId));
+
+  const memberCollabs = await db
+    .select({ projectId: schema.projectCollaborators.projectId })
+    .from(schema.projectCollaborators)
+    .where(eq(schema.projectCollaborators.userId, forUserId));
+
+  const memberIds = memberCollabs.map((m) => m.projectId);
+  let memberProjects: Array<typeof schema.projects.$inferSelect> = [];
+  if (memberIds.length > 0) {
+    memberProjects = await db
       .select()
       .from(schema.projects)
-      .where(eq(schema.projects.ownerId, forUserId));
-
-    const memberCollabs = await db
-      .select({ projectId: schema.projectCollaborators.projectId })
-      .from(schema.projectCollaborators)
-      .where(eq(schema.projectCollaborators.userId, forUserId));
-
-    const memberIds = memberCollabs.map((m) => m.projectId);
-    let memberProjects: Array<typeof schema.projects.$inferSelect> = [];
-    if (memberIds.length > 0) {
-      memberProjects = await db
-        .select()
-        .from(schema.projects)
-        .where(inArray(schema.projects.id, memberIds));
-    }
-
-    const map = new Map<string, typeof schema.projects.$inferSelect>();
-    for (const p of owned) map.set(p.id, p);
-    for (const p of memberProjects) map.set(p.id, p);
-    allProjects = Array.from(map.values()).sort(
-      (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
-    );
-  } else {
-    allProjects = await db
-      .select()
-      .from(schema.projects)
-      .orderBy(asc(schema.projects.createdAt));
+      .where(inArray(schema.projects.id, memberIds));
   }
+
+  const map = new Map<string, typeof schema.projects.$inferSelect>();
+  for (const p of owned) map.set(p.id, p);
+  for (const p of memberProjects) map.set(p.id, p);
+  allProjects = Array.from(map.values()).sort(
+    (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
+  );
 
   const results: EnrichedProject[] = [];
   for (const p of allProjects) {
@@ -338,8 +335,25 @@ export async function getProjectByIdOrSlug(
     .orderBy(desc(schema.projectInvites.createdAt))
     .limit(1);
 
+  // Determine userRole
+  let userRole: "owner" | "editor" | null = null;
+  if (forUserId) {
+    if (forUserId === project.ownerId) {
+      userRole = "owner";
+    } else if (collabRows.some((c) => c.userId === forUserId)) {
+      userRole = "editor";
+    }
+  } else {
+    userRole = null;
+  }
+
+  // If a specific userId was requested and the user has neither owner nor editor role, deny access
+  if (forUserId && !userRole) {
+    return null;
+  }
+
   let inviteCode = inviteRows[0]?.code;
-  if (!inviteCode) {
+  if (!inviteCode && userRole === "owner") {
     inviteCode = generateInviteCode();
     await db.insert(schema.projectInvites).values({
       id: `inv_${crypto.randomBytes(5).toString("hex")}`,
@@ -351,16 +365,8 @@ export async function getProjectByIdOrSlug(
     });
   }
 
-  // Determine userRole
-  let userRole: "owner" | "editor" | null = null;
-  if (forUserId) {
-    if (forUserId === project.ownerId) {
-      userRole = "owner";
-    } else if (collabRows.some((c) => c.userId === forUserId)) {
-      userRole = "editor";
-    }
-  } else {
-    userRole = "owner";
+  if (userRole !== "owner") {
+    inviteCode = "";
   }
 
   // Pending requests if owner
@@ -603,7 +609,10 @@ export async function createProject(input: {
     ? `${baseSlug}-${crypto.randomBytes(2).toString("hex")}`
     : baseSlug;
 
-  const ownerId = input.ownerId || DEFAULT_USER_ID;
+  if (!input.ownerId) {
+    throw new Error("Field 'ownerId' is required to create a project.");
+  }
+  const ownerId = input.ownerId;
 
   await db.insert(schema.projects).values({
     id,
@@ -1025,25 +1034,28 @@ export async function updateFeatureStatus(
 
 export async function listApiKeys(userId?: string) {
   await ensureDatabaseReady();
-  const query = userId
-    ? eq(schema.apiKeys.userId, userId)
-    : undefined;
+  if (!userId) {
+    return [];
+  }
 
   return db
     .select()
     .from(schema.apiKeys)
-    .where(query)
+    .where(eq(schema.apiKeys.userId, userId))
     .orderBy(desc(schema.apiKeys.createdAt));
 }
 
 export async function createNewApiKey(name: string, userId?: string) {
   await ensureDatabaseReady();
+  if (!userId) {
+    throw new Error("Field 'userId' is required to create an API key.");
+  }
   const { rawKey, keyHash, keyPrefix } = generateApiKey();
   const id = `key_${crypto.randomBytes(5).toString("hex")}`;
 
   await db.insert(schema.apiKeys).values({
     id,
-    userId: userId || DEFAULT_USER_ID,
+    userId,
     name: name.trim() || "Coding Agent Skill Key",
     keyHash,
     keyPrefix,
@@ -1114,17 +1126,14 @@ export async function getOrCreateUser(input: {
     return user;
   }
 
-  const id =
-    normalizedEmail === "architect@keyzor.vercel.app"
-      ? DEFAULT_USER_ID
-      : `usr_${crypto.randomBytes(6).toString("hex")}`;
+  const id = `usr_${crypto.randomBytes(6).toString("hex")}`;
 
   const newUser = {
     id,
     email: normalizedEmail,
     name: input.name?.trim() || "Software Architect",
     image: input.image ?? null,
-    provider: input.provider || "credentials",
+    provider: input.provider || "oauth",
   };
 
   await db.insert(schema.users).values(newUser);

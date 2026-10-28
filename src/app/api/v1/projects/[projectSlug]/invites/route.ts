@@ -2,10 +2,9 @@ import { NextResponse } from "next/server";
 import {
   getOrCreateProjectInvite,
   rotateProjectInvite,
-  authenticateAgentRequest,
+  getProjectPermission,
 } from "@/lib/services/lifecycle-service";
-import { auth } from "@/auth";
-import { DEFAULT_USER_ID } from "@/db";
+import { resolveCaller } from "@/lib/api/auth-helper";
 
 function getBaseUrl(req: Request): string {
   const url = new URL(req.url);
@@ -14,29 +13,35 @@ function getBaseUrl(req: Request): string {
   return `${proto}://${host}`;
 }
 
-async function resolveCaller(req: Request): Promise<{ id: string }> {
-  const authHeader = req.headers.get("authorization");
-  if (authHeader) {
-    const agentAuth = await authenticateAgentRequest(authHeader);
-    if (agentAuth.valid && agentAuth.userId) {
-      return { id: agentAuth.userId };
-    }
-  }
-  const session = await auth();
-  if (session?.user?.id) {
-    return { id: session.user.id };
-  }
-  return { id: DEFAULT_USER_ID };
-}
-
 export async function GET(
   req: Request,
   context: { params: Promise<{ projectSlug: string }> }
 ) {
   try {
-    const { projectSlug } = await context.params;
     const caller = await resolveCaller(req);
-    const invite = await getOrCreateProjectInvite(projectSlug, caller.id);
+    if (!caller) {
+      return NextResponse.json(
+        { ok: false, error: "Authentication required. Please sign in or provide a valid Bearer API key." },
+        { status: 401 }
+      );
+    }
+
+    const { projectSlug } = await context.params;
+    const perm = await getProjectPermission(projectSlug, caller.userId);
+    if (!perm.project) {
+      return NextResponse.json(
+        { ok: false, error: `Project '${projectSlug}' not found.` },
+        { status: 404 }
+      );
+    }
+    if (perm.role !== "owner") {
+      return NextResponse.json(
+        { ok: false, error: "Only the project owner can view invite codes." },
+        { status: 403 }
+      );
+    }
+
+    const invite = await getOrCreateProjectInvite(projectSlug, caller.userId);
     const baseUrl = getBaseUrl(req);
 
     return NextResponse.json({
@@ -59,13 +64,33 @@ export async function POST(
   context: { params: Promise<{ projectSlug: string }> }
 ) {
   try {
-    const { projectSlug } = await context.params;
     const caller = await resolveCaller(req);
-    const body = await req.json().catch(() => ({}));
+    if (!caller) {
+      return NextResponse.json(
+        { ok: false, error: "Authentication required. Please sign in or provide a valid Bearer API key." },
+        { status: 401 }
+      );
+    }
 
+    const { projectSlug } = await context.params;
+    const perm = await getProjectPermission(projectSlug, caller.userId);
+    if (!perm.project) {
+      return NextResponse.json(
+        { ok: false, error: `Project '${projectSlug}' not found.` },
+        { status: 404 }
+      );
+    }
+    if (perm.role !== "owner") {
+      return NextResponse.json(
+        { ok: false, error: "Only the project owner can rotate invite codes." },
+        { status: 403 }
+      );
+    }
+
+    const body = await req.json().catch(() => ({}));
     const invite = body.rotate
-      ? await rotateProjectInvite(projectSlug, caller.id)
-      : await getOrCreateProjectInvite(projectSlug, caller.id);
+      ? await rotateProjectInvite(projectSlug, caller.userId)
+      : await getOrCreateProjectInvite(projectSlug, caller.userId);
 
     const baseUrl = getBaseUrl(req);
     return NextResponse.json({
