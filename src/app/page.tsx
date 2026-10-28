@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const session = await auth();
-  const projects = await listProjects();
+  const userId = session?.user?.id;
+  const projects = await listProjects(userId);
 
   const userEmail = session?.user?.email || "architect@keyzor.vercel.app";
   const userName = session?.user?.name || "Lead Architect (CPO / Dev)";
@@ -18,6 +19,7 @@ export default async function HomePage() {
       defaultApiKey=""
       userEmail={userEmail}
       userName={userName}
+      currentUserId={userId || ""}
     />
   );
 }

@@ -66,28 +66,29 @@ export function ScheduleHealthBadge({
 
   if (scheduleHealth === "slipping" && scheduleVarianceDays !== null) {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-        <AlertTriangle className="w-3 h-3 text-rose-500" />+{scheduleVarianceDays}d Slipping
+      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+        <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+        <span>+{scheduleVarianceDays}d Slipping</span>
       </span>
     );
   }
   if (scheduleHealth === "early" && scheduleVarianceDays !== null) {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-teal-50 text-teal-700 border border-teal-200">
-        {Math.abs(scheduleVarianceDays)}d Ahead
+      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold bg-teal-50 text-teal-700 border border-teal-200 whitespace-nowrap">
+        <span>{Math.abs(scheduleVarianceDays)}d Ahead</span>
       </span>
     );
   }
   if (scheduleHealth === "on_track") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-        On Track
+      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+        <span>On Track</span>
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
-      TBD
+    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 whitespace-nowrap">
+      <span>TBD</span>
     </span>
   );
 }
@@ -109,10 +110,10 @@ export function FourQuestionsCardRow({
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4 bg-slate-50/70 border-b border-slate-200/80">
-      {/* 1. WHERE IS THIS FEATURE? */}
+      {/* STAGE */}
       <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-xs flex flex-col justify-between">
         <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-1">
-          <span>1. Where is this feature?</span>
+          <span>Stage</span>
           <span className="text-indigo-600 font-semibold">
             {q.where.stageIndex + 1}/{q.where.totalStages} ({q.where.percentComplete}%)
           </span>
@@ -136,10 +137,10 @@ export function FourQuestionsCardRow({
         </div>
       </div>
 
-      {/* 2. WHO IS WORKING ON IT? */}
+      {/* CURRENT OWNER */}
       <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-xs flex flex-col justify-between">
         <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-1">
-          <span>2. Who is working on it?</span>
+          <span>Current Owner</span>
           <User className="w-3.5 h-3.5 text-purple-600" />
         </div>
         <div className="flex items-center justify-between gap-2 mt-1">
@@ -157,10 +158,10 @@ export function FourQuestionsCardRow({
         </div>
       </div>
 
-      {/* 3. WHEN DO WE WANT IT DONE? */}
+      {/* TARGET */}
       <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-xs flex flex-col justify-between">
         <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-1">
-          <span>3. When do we want it done?</span>
+          <span>Target</span>
           <Calendar className="w-3.5 h-3.5 text-slate-400" />
         </div>
         <div className="flex items-center justify-between gap-2 mt-1">
@@ -171,10 +172,10 @@ export function FourQuestionsCardRow({
         </div>
       </div>
 
-      {/* 4. WHEN DO WE EXPECT IT TO BE DONE? */}
+      {/* PROJECTED */}
       <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-xs flex flex-col justify-between">
         <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-1">
-          <span>4. When do we expect it done?</span>
+          <span>Projected</span>
           <ScheduleHealthBadge feature={feature} />
         </div>
         <div className="flex items-center justify-between gap-2 mt-1">

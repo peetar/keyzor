@@ -177,6 +177,41 @@ export async function ensureDatabaseReady(): Promise<void> {
       )
     `);
 
+    await activeDb.execute(sql`
+      CREATE TABLE IF NOT EXISTS project_collaborators (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role TEXT NOT NULL DEFAULT 'editor',
+        invited_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        joined_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await activeDb.execute(sql`
+      CREATE TABLE IF NOT EXISTS project_invites (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        code TEXT NOT NULL UNIQUE,
+        created_by TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        uses_count INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await activeDb.execute(sql`
+      CREATE TABLE IF NOT EXISTS project_access_requests (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        status TEXT NOT NULL DEFAULT 'pending',
+        reviewed_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        reviewed_at TIMESTAMP
+      )
+    `);
+
     const existingUsers = await activeDb
       .select()
       .from(schema.users)

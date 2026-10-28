@@ -3,6 +3,7 @@ import GitHub from "next-auth/providers/github";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { DEFAULT_USER_ID } from "@/db";
+import { getOrCreateUser } from "@/lib/services/lifecycle-service";
 
 const providers = [];
 
@@ -62,6 +63,30 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   providers,
   session: {
     strategy: "jwt",
+  },
+  callbacks: {
+    async jwt({ token, user, account }) {
+      if (user?.email) {
+        try {
+          const dbUser = await getOrCreateUser({
+            email: user.email,
+            name: user.name,
+            image: user.image,
+            provider: account?.provider || "credentials",
+          });
+          token.userId = dbUser.id;
+        } catch (e) {
+          console.error("Error syncing user in auth jwt callback:", e);
+        }
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (token?.userId && session.user) {
+        session.user.id = token.userId as string;
+      }
+      return session;
+    },
   },
   pages: {
     signIn: "/login",

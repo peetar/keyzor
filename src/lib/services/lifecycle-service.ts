@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { eq, asc, desc, and } from "drizzle-orm";
+import { eq, asc, desc, and, inArray, sql } from "drizzle-orm";
 import { db, ensureDatabaseReady, DEFAULT_USER_ID } from "@/db";
 import * as schema from "@/db/schema";
 import {
@@ -72,13 +72,42 @@ export interface EnrichedFeature {
   updatedAt: string;
 }
 
+export interface ProjectCollaboratorInfo {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  image: string | null;
+  role: "owner" | "editor";
+  joinedAt: string;
+}
+
+export interface ProjectAccessRequestInfo {
+  id: string;
+  projectId: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userImage: string | null;
+  status: string;
+  createdAt: string;
+}
+
 export interface EnrichedProject {
   id: string;
+  ownerId: string;
+  ownerName?: string;
+  ownerEmail?: string;
+  userRole?: "owner" | "editor" | null;
   slug: string;
   name: string;
   description: string;
   shareEnabled: boolean;
   encryptedShareToken: string;
+  inviteCode?: string;
+  collaborators?: ProjectCollaboratorInfo[];
+  pendingRequests?: ProjectAccessRequestInfo[];
+  pendingRequestsCount?: number;
   defaultStages: schema.StageTemplateItem[];
   features: EnrichedFeature[];
   recentActivity: Array<{
@@ -156,23 +185,63 @@ function computeFourQuestions(
   };
 }
 
-export async function listProjects(): Promise<EnrichedProject[]> {
+function generateInviteCode(): string {
+  const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+  let code = "KZ-";
+  for (let i = 0; i < 5; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+export async function listProjects(forUserId?: string): Promise<EnrichedProject[]> {
   await ensureDatabaseReady();
-  const allProjects = await db
-    .select()
-    .from(schema.projects)
-    .orderBy(asc(schema.projects.createdAt));
+  let allProjects: Array<typeof schema.projects.$inferSelect> = [];
+
+  if (forUserId) {
+    const owned = await db
+      .select()
+      .from(schema.projects)
+      .where(eq(schema.projects.ownerId, forUserId));
+
+    const memberCollabs = await db
+      .select({ projectId: schema.projectCollaborators.projectId })
+      .from(schema.projectCollaborators)
+      .where(eq(schema.projectCollaborators.userId, forUserId));
+
+    const memberIds = memberCollabs.map((m) => m.projectId);
+    let memberProjects: Array<typeof schema.projects.$inferSelect> = [];
+    if (memberIds.length > 0) {
+      memberProjects = await db
+        .select()
+        .from(schema.projects)
+        .where(inArray(schema.projects.id, memberIds));
+    }
+
+    const map = new Map<string, typeof schema.projects.$inferSelect>();
+    for (const p of owned) map.set(p.id, p);
+    for (const p of memberProjects) map.set(p.id, p);
+    allProjects = Array.from(map.values()).sort(
+      (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
+    );
+  } else {
+    allProjects = await db
+      .select()
+      .from(schema.projects)
+      .orderBy(asc(schema.projects.createdAt));
+  }
 
   const results: EnrichedProject[] = [];
   for (const p of allProjects) {
-    const enriched = await getProjectByIdOrSlug(p.id);
+    const enriched = await getProjectByIdOrSlug(p.id, forUserId);
     if (enriched) results.push(enriched);
   }
   return results;
 }
 
 export async function getProjectByIdOrSlug(
-  idOrSlug: string
+  idOrSlug: string,
+  forUserId?: string
 ): Promise<EnrichedProject | null> {
   await ensureDatabaseReady();
   const rows = await db
@@ -210,8 +279,135 @@ export async function getProjectByIdOrSlug(
     .orderBy(desc(schema.activityLogs.createdAt))
     .limit(20);
 
+  // Fetch owner info
+  const ownerRows = await db
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.id, project.ownerId));
+  const owner = ownerRows[0];
+
+  // Fetch collaborators
+  const collabRows = await db
+    .select({
+      id: schema.projectCollaborators.id,
+      userId: schema.projectCollaborators.userId,
+      role: schema.projectCollaborators.role,
+      joinedAt: schema.projectCollaborators.joinedAt,
+      userName: schema.users.name,
+      userEmail: schema.users.email,
+      userImage: schema.users.image,
+    })
+    .from(schema.projectCollaborators)
+    .leftJoin(
+      schema.users,
+      eq(schema.projectCollaborators.userId, schema.users.id)
+    )
+    .where(eq(schema.projectCollaborators.projectId, project.id));
+
+  const collaborators: ProjectCollaboratorInfo[] = [
+    {
+      id: `owner_${project.ownerId}`,
+      userId: project.ownerId,
+      name: owner?.name || "Project Owner",
+      email: owner?.email || "",
+      image: owner?.image || null,
+      role: "owner",
+      joinedAt: project.createdAt.toISOString(),
+    },
+    ...collabRows.map((c) => ({
+      id: c.id,
+      userId: c.userId,
+      name: c.userName || c.userEmail || "Collaborator",
+      email: c.userEmail || "",
+      image: c.userImage || null,
+      role: (c.role as "owner" | "editor") || "editor",
+      joinedAt: c.joinedAt.toISOString(),
+    })),
+  ];
+
+  // Active invite code
+  const inviteRows = await db
+    .select()
+    .from(schema.projectInvites)
+    .where(
+      and(
+        eq(schema.projectInvites.projectId, project.id),
+        eq(schema.projectInvites.isActive, true)
+      )
+    )
+    .orderBy(desc(schema.projectInvites.createdAt))
+    .limit(1);
+
+  let inviteCode = inviteRows[0]?.code;
+  if (!inviteCode) {
+    inviteCode = generateInviteCode();
+    await db.insert(schema.projectInvites).values({
+      id: `inv_${crypto.randomBytes(5).toString("hex")}`,
+      projectId: project.id,
+      code: inviteCode,
+      createdBy: project.ownerId,
+      isActive: true,
+      usesCount: 0,
+    });
+  }
+
+  // Determine userRole
+  let userRole: "owner" | "editor" | null = null;
+  if (forUserId) {
+    if (forUserId === project.ownerId) {
+      userRole = "owner";
+    } else if (collabRows.some((c) => c.userId === forUserId)) {
+      userRole = "editor";
+    }
+  } else {
+    userRole = "owner";
+  }
+
+  // Pending requests if owner
+  let pendingRequests: ProjectAccessRequestInfo[] = [];
+  if (userRole === "owner") {
+    const reqRows = await db
+      .select({
+        id: schema.projectAccessRequests.id,
+        projectId: schema.projectAccessRequests.projectId,
+        userId: schema.projectAccessRequests.userId,
+        status: schema.projectAccessRequests.status,
+        createdAt: schema.projectAccessRequests.createdAt,
+        userName: schema.users.name,
+        userEmail: schema.users.email,
+        userImage: schema.users.image,
+      })
+      .from(schema.projectAccessRequests)
+      .leftJoin(
+        schema.users,
+        eq(schema.projectAccessRequests.userId, schema.users.id)
+      )
+      .where(
+        and(
+          eq(schema.projectAccessRequests.projectId, project.id),
+          eq(schema.projectAccessRequests.status, "pending")
+        )
+      )
+      .orderBy(desc(schema.projectAccessRequests.createdAt));
+
+    pendingRequests = reqRows.map((r) => ({
+      id: r.id,
+      projectId: r.projectId,
+      userId: r.userId,
+      userName: r.userName || r.userEmail || "User",
+      userEmail: r.userEmail || "",
+      userImage: r.userImage || null,
+      status: r.status,
+      createdAt: r.createdAt.toISOString(),
+    }));
+  }
+
   return {
     id: project.id,
+    ownerId: project.ownerId,
+    ownerName: owner?.name || "Project Owner",
+    ownerEmail: owner?.email || "",
+    userRole,
     slug: project.slug,
     name: project.name,
     description: project.description,
@@ -220,6 +416,10 @@ export async function getProjectByIdOrSlug(
       project.id,
       project.shareVersion
     ),
+    inviteCode,
+    collaborators,
+    pendingRequests,
+    pendingRequestsCount: pendingRequests.length,
     defaultStages: project.defaultStages ?? schema.DEFAULT_ARCHITECT_STAGES,
     features: enrichedFeatures,
     recentActivity: logs.map((l) => ({
@@ -393,6 +593,7 @@ export async function createProject(input: {
   defaultStages?: schema.StageTemplateItem[];
   actorName?: string;
   actorType?: "agent" | "human";
+  ownerId?: string;
 }): Promise<EnrichedProject> {
   await ensureDatabaseReady();
   const id = `proj_${crypto.randomBytes(5).toString("hex")}`;
@@ -402,9 +603,11 @@ export async function createProject(input: {
     ? `${baseSlug}-${crypto.randomBytes(2).toString("hex")}`
     : baseSlug;
 
+  const ownerId = input.ownerId || DEFAULT_USER_ID;
+
   await db.insert(schema.projects).values({
     id,
-    ownerId: DEFAULT_USER_ID,
+    ownerId,
     slug,
     name: input.name,
     description: input.description ?? "",
@@ -414,6 +617,16 @@ export async function createProject(input: {
       input.defaultStages && input.defaultStages.length > 0
         ? input.defaultStages
         : schema.DEFAULT_ARCHITECT_STAGES,
+  });
+
+  const inviteCode = generateInviteCode();
+  await db.insert(schema.projectInvites).values({
+    id: `inv_${crypto.randomBytes(5).toString("hex")}`,
+    projectId: id,
+    code: inviteCode,
+    createdBy: ownerId,
+    isActive: true,
+    usesCount: 0,
   });
 
   await db.insert(schema.activityLogs).values({
@@ -810,22 +1023,27 @@ export async function updateFeatureStatus(
   return refreshed;
 }
 
-export async function listApiKeys() {
+export async function listApiKeys(userId?: string) {
   await ensureDatabaseReady();
+  const query = userId
+    ? eq(schema.apiKeys.userId, userId)
+    : undefined;
+
   return db
     .select()
     .from(schema.apiKeys)
+    .where(query)
     .orderBy(desc(schema.apiKeys.createdAt));
 }
 
-export async function createNewApiKey(name: string) {
+export async function createNewApiKey(name: string, userId?: string) {
   await ensureDatabaseReady();
   const { rawKey, keyHash, keyPrefix } = generateApiKey();
   const id = `key_${crypto.randomBytes(5).toString("hex")}`;
 
   await db.insert(schema.apiKeys).values({
     id,
-    userId: DEFAULT_USER_ID,
+    userId: userId || DEFAULT_USER_ID,
     name: name.trim() || "Coding Agent Skill Key",
     keyHash,
     keyPrefix,
@@ -836,7 +1054,7 @@ export async function createNewApiKey(name: string) {
 
 export async function authenticateAgentRequest(
   authHeader: string | null
-): Promise<{ valid: boolean; keyName: string }> {
+): Promise<{ valid: boolean; keyName: string; userId?: string }> {
   await ensureDatabaseReady();
   if (!authHeader) {
     return { valid: false, keyName: "Unauthenticated" };
@@ -862,5 +1080,483 @@ export async function authenticateAgentRequest(
     .set({ lastUsedAt: new Date() })
     .where(eq(schema.apiKeys.id, found[0].id));
 
-  return { valid: true, keyName: found[0].name };
+  return { valid: true, keyName: found[0].name, userId: found[0].userId };
 }
+
+export async function getOrCreateUser(input: {
+  email: string;
+  name?: string | null;
+  image?: string | null;
+  provider?: string;
+}): Promise<{
+  id: string;
+  email: string;
+  name: string;
+  image: string | null;
+  provider: string;
+}> {
+  await ensureDatabaseReady();
+  const normalizedEmail = input.email.trim().toLowerCase();
+  const existing = await db
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.email, normalizedEmail));
+
+  if (existing.length > 0) {
+    const user = existing[0];
+    if (input.name && input.name !== user.name) {
+      await db
+        .update(schema.users)
+        .set({ name: input.name, image: input.image ?? user.image })
+        .where(eq(schema.users.id, user.id));
+      user.name = input.name;
+    }
+    return user;
+  }
+
+  const id =
+    normalizedEmail === "architect@keyzor.vercel.app"
+      ? DEFAULT_USER_ID
+      : `usr_${crypto.randomBytes(6).toString("hex")}`;
+
+  const newUser = {
+    id,
+    email: normalizedEmail,
+    name: input.name?.trim() || "Software Architect",
+    image: input.image ?? null,
+    provider: input.provider || "credentials",
+  };
+
+  await db.insert(schema.users).values(newUser);
+  return newUser;
+}
+
+export async function getProjectPermission(
+  projectIdOrSlug: string,
+  userId: string
+): Promise<{
+  hasAccess: boolean;
+  role: "owner" | "editor" | null;
+  project: typeof schema.projects.$inferSelect | null;
+}> {
+  await ensureDatabaseReady();
+  const rows = await db
+    .select()
+    .from(schema.projects)
+    .where(eq(schema.projects.slug, projectIdOrSlug));
+  const project =
+    rows[0] ??
+    (
+      await db
+        .select()
+        .from(schema.projects)
+        .where(eq(schema.projects.id, projectIdOrSlug))
+    )[0];
+
+  if (!project) {
+    return { hasAccess: false, role: null, project: null };
+  }
+
+  if (project.ownerId === userId) {
+    return { hasAccess: true, role: "owner", project };
+  }
+
+  const membership = await db
+    .select()
+    .from(schema.projectCollaborators)
+    .where(
+      and(
+        eq(schema.projectCollaborators.projectId, project.id),
+        eq(schema.projectCollaborators.userId, userId)
+      )
+    );
+
+  if (membership.length > 0) {
+    return { hasAccess: true, role: "editor", project };
+  }
+
+  return { hasAccess: false, role: null, project };
+}
+
+export async function getOrCreateProjectInvite(
+  projectIdOrSlug: string,
+  userId: string
+): Promise<{ code: string }> {
+  await ensureDatabaseReady();
+  const perm = await getProjectPermission(projectIdOrSlug, userId);
+  if (!perm.project || !perm.hasAccess) {
+    throw new Error("Project not found or unauthorized.");
+  }
+
+  const activeInvites = await db
+    .select()
+    .from(schema.projectInvites)
+    .where(
+      and(
+        eq(schema.projectInvites.projectId, perm.project.id),
+        eq(schema.projectInvites.isActive, true)
+      )
+    );
+
+  if (activeInvites.length > 0) {
+    return { code: activeInvites[0].code };
+  }
+
+  const code = generateInviteCode();
+  await db.insert(schema.projectInvites).values({
+    id: `inv_${crypto.randomBytes(5).toString("hex")}`,
+    projectId: perm.project.id,
+    code,
+    createdBy: userId,
+    isActive: true,
+    usesCount: 0,
+  });
+
+  return { code };
+}
+
+export async function rotateProjectInvite(
+  projectIdOrSlug: string,
+  userId: string
+): Promise<{ code: string }> {
+  await ensureDatabaseReady();
+  const perm = await getProjectPermission(projectIdOrSlug, userId);
+  if (!perm.project || perm.role !== "owner") {
+    throw new Error("Only the project owner can rotate the invite code.");
+  }
+
+  await db
+    .update(schema.projectInvites)
+    .set({ isActive: false })
+    .where(eq(schema.projectInvites.projectId, perm.project.id));
+
+  const code = generateInviteCode();
+  await db.insert(schema.projectInvites).values({
+    id: `inv_${crypto.randomBytes(5).toString("hex")}`,
+    projectId: perm.project.id,
+    code,
+    createdBy: userId,
+    isActive: true,
+    usesCount: 0,
+  });
+
+  await db.insert(schema.activityLogs).values({
+    id: `act_${crypto.randomBytes(5).toString("hex")}`,
+    projectId: perm.project.id,
+    actorType: "human",
+    actorName: "Project Owner",
+    action: "Rotated Invite Code",
+    details: `Generated new invite code ${code}.`,
+  });
+
+  return { code };
+}
+
+export async function joinProjectWithCode(
+  code: string,
+  user: { id: string; name: string; email: string }
+): Promise<EnrichedProject> {
+  await ensureDatabaseReady();
+  const cleanCode = code.trim().toUpperCase();
+
+  const invites = await db
+    .select()
+    .from(schema.projectInvites)
+    .where(
+      and(
+        eq(schema.projectInvites.code, cleanCode),
+        eq(schema.projectInvites.isActive, true)
+      )
+    );
+
+  if (invites.length === 0) {
+    throw new Error("Invalid, expired, or revoked invite code.");
+  }
+
+  const invite = invites[0];
+  const project = (
+    await db
+      .select()
+      .from(schema.projects)
+      .where(eq(schema.projects.id, invite.projectId))
+  )[0];
+
+  if (!project) throw new Error("Project no longer exists.");
+
+  // If user is owner, they already have access
+  if (project.ownerId === user.id) {
+    const enriched = await getProjectByIdOrSlug(project.id, user.id);
+    if (!enriched) throw new Error("Failed to load project.");
+    return enriched;
+  }
+
+  // Check if user is already a collaborator
+  const existingMember = await db
+    .select()
+    .from(schema.projectCollaborators)
+    .where(
+      and(
+        eq(schema.projectCollaborators.projectId, project.id),
+        eq(schema.projectCollaborators.userId, user.id)
+      )
+    );
+
+  if (existingMember.length === 0) {
+    await db.insert(schema.projectCollaborators).values({
+      id: `collab_${crypto.randomBytes(5).toString("hex")}`,
+      projectId: project.id,
+      userId: user.id,
+      role: "editor",
+      invitedBy: invite.createdBy,
+    });
+
+    await db
+      .update(schema.projectInvites)
+      .set({ usesCount: invite.usesCount + 1 })
+      .where(eq(schema.projectInvites.id, invite.id));
+
+    // Clear any pending access request for this user on this project
+    await db
+      .update(schema.projectAccessRequests)
+      .set({ status: "approved", reviewedAt: new Date() })
+      .where(
+        and(
+          eq(schema.projectAccessRequests.projectId, project.id),
+          eq(schema.projectAccessRequests.userId, user.id),
+          eq(schema.projectAccessRequests.status, "pending")
+        )
+      );
+
+    await db.insert(schema.activityLogs).values({
+      id: `act_${crypto.randomBytes(5).toString("hex")}`,
+      projectId: project.id,
+      actorType: "human",
+      actorName: user.name || user.email,
+      action: "Joined Project",
+      details: `${user.name || user.email} joined as a collaborator via invite code ${cleanCode}.`,
+    });
+  }
+
+  const enriched = await getProjectByIdOrSlug(project.id, user.id);
+  if (!enriched) throw new Error("Failed to load joined project.");
+  return enriched;
+}
+
+export async function requestProjectAccess(
+  projectIdOrSlug: string,
+  user: { id: string; name: string; email: string }
+): Promise<{ status: "pending" | "already_member"; message: string }> {
+  await ensureDatabaseReady();
+  const perm = await getProjectPermission(projectIdOrSlug, user.id);
+  if (!perm.project) {
+    throw new Error("Project not found.");
+  }
+
+  if (perm.hasAccess) {
+    return {
+      status: "already_member",
+      message: "You already have collaborator access to this project.",
+    };
+  }
+
+  const existing = await db
+    .select()
+    .from(schema.projectAccessRequests)
+    .where(
+      and(
+        eq(schema.projectAccessRequests.projectId, perm.project.id),
+        eq(schema.projectAccessRequests.userId, user.id),
+        eq(schema.projectAccessRequests.status, "pending")
+      )
+    );
+
+  if (existing.length > 0) {
+    return {
+      status: "pending",
+      message: "Your request is already pending approval from the project owner.",
+    };
+  }
+
+  await db.insert(schema.projectAccessRequests).values({
+    id: `req_${crypto.randomBytes(5).toString("hex")}`,
+    projectId: perm.project.id,
+    userId: user.id,
+    status: "pending",
+  });
+
+  await db.insert(schema.activityLogs).values({
+    id: `act_${crypto.randomBytes(5).toString("hex")}`,
+    projectId: perm.project.id,
+    actorType: "human",
+    actorName: user.name || user.email,
+    action: "Requested Access",
+    details: `${user.name || user.email} requested collaborator access.`,
+  });
+
+  return {
+    status: "pending",
+    message: "Access request submitted. The project owner can approve it in their dashboard.",
+  };
+}
+
+export async function reviewProjectAccessRequest(
+  requestId: string,
+  action: "approved" | "rejected",
+  reviewerUserId: string
+): Promise<{ success: boolean; message: string }> {
+  await ensureDatabaseReady();
+  const requests = await db
+    .select()
+    .from(schema.projectAccessRequests)
+    .where(eq(schema.projectAccessRequests.id, requestId));
+
+  if (requests.length === 0) {
+    throw new Error("Access request not found.");
+  }
+
+  const req = requests[0];
+  const perm = await getProjectPermission(req.projectId, reviewerUserId);
+  if (perm.role !== "owner") {
+    throw new Error("Only the project owner can approve or reject access requests.");
+  }
+
+  await db
+    .update(schema.projectAccessRequests)
+    .set({
+      status: action,
+      reviewedBy: reviewerUserId,
+      reviewedAt: new Date(),
+    })
+    .where(eq(schema.projectAccessRequests.id, requestId));
+
+  if (action === "approved") {
+    const existingMember = await db
+      .select()
+      .from(schema.projectCollaborators)
+      .where(
+        and(
+          eq(schema.projectCollaborators.projectId, req.projectId),
+          eq(schema.projectCollaborators.userId, req.userId)
+        )
+      );
+
+    if (existingMember.length === 0) {
+      await db.insert(schema.projectCollaborators).values({
+        id: `collab_${crypto.randomBytes(5).toString("hex")}`,
+        projectId: req.projectId,
+        userId: req.userId,
+        role: "editor",
+        invitedBy: reviewerUserId,
+      });
+    }
+
+    const targetUser = (
+      await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, req.userId))
+    )[0];
+
+    await db.insert(schema.activityLogs).values({
+      id: `act_${crypto.randomBytes(5).toString("hex")}`,
+      projectId: req.projectId,
+      actorType: "human",
+      actorName: "Project Owner",
+      action: "Approved Access Request",
+      details: `Approved collaborator access for ${targetUser?.name || targetUser?.email || "collaborator"}.`,
+    });
+  }
+
+  return {
+    success: true,
+    message: `Request ${action} successfully.`,
+  };
+}
+
+export async function removeProjectCollaborator(
+  projectIdOrSlug: string,
+  targetUserId: string,
+  requestingUserId: string
+): Promise<{ success: boolean }> {
+  await ensureDatabaseReady();
+  const perm = await getProjectPermission(projectIdOrSlug, requestingUserId);
+  if (perm.role !== "owner") {
+    throw new Error("Only the project owner can remove collaborators.");
+  }
+  if (!perm.project) throw new Error("Project not found.");
+  if (perm.project.ownerId === targetUserId) {
+    throw new Error("The project owner cannot be removed.");
+  }
+
+  await db
+    .delete(schema.projectCollaborators)
+    .where(
+      and(
+        eq(schema.projectCollaborators.projectId, perm.project.id),
+        eq(schema.projectCollaborators.userId, targetUserId)
+      )
+    );
+
+  await db.insert(schema.activityLogs).values({
+    id: `act_${crypto.randomBytes(5).toString("hex")}`,
+    projectId: perm.project.id,
+    actorType: "human",
+    actorName: "Project Owner",
+    action: "Removed Collaborator",
+    details: `Removed collaborator from project.`,
+  });
+
+  return { success: true };
+}
+
+export async function renameProject(
+  projectIdOrSlug: string,
+  newName: string,
+  userId: string
+): Promise<EnrichedProject> {
+  await ensureDatabaseReady();
+  const perm = await getProjectPermission(projectIdOrSlug, userId);
+  if (perm.role !== "owner") {
+    throw new Error("Only the project owner can rename the project.");
+  }
+  if (!perm.project) throw new Error("Project not found.");
+
+  const trimmed = newName.trim();
+  if (!trimmed) throw new Error("Project name cannot be empty.");
+
+  await db
+    .update(schema.projects)
+    .set({ name: trimmed, updatedAt: new Date() })
+    .where(eq(schema.projects.id, perm.project.id));
+
+  await db.insert(schema.activityLogs).values({
+    id: `act_${crypto.randomBytes(5).toString("hex")}`,
+    projectId: perm.project.id,
+    actorType: "human",
+    actorName: "Project Owner",
+    action: "Renamed Project",
+    details: `Renamed project to '${trimmed}'.`,
+  });
+
+  const updated = await getProjectByIdOrSlug(perm.project.id, userId);
+  if (!updated) throw new Error("Failed to load renamed project.");
+  return updated;
+}
+
+export async function deleteProject(
+  projectIdOrSlug: string,
+  userId: string
+): Promise<{ success: boolean; deletedSlug: string }> {
+  await ensureDatabaseReady();
+  const perm = await getProjectPermission(projectIdOrSlug, userId);
+  if (perm.role !== "owner") {
+    throw new Error("Only the project owner can delete this project.");
+  }
+  if (!perm.project) throw new Error("Project not found.");
+
+  const slug = perm.project.slug;
+  await db.delete(schema.projects).where(eq(schema.projects.id, perm.project.id));
+
+  return { success: true, deletedSlug: slug };
+}
+

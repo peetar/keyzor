@@ -49,43 +49,6 @@ export function StakeholderShareView({
               </p>
             </div>
           </div>
-
-          {/* View Toggle for Stakeholders */}
-          <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 shadow-2xs">
-            <button
-              onClick={() => setViewMode("gantt")}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                viewMode === "gantt"
-                  ? "bg-purple-600 text-white font-semibold shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <BarChart3 className="w-3.5 h-3.5" />
-              Gantt Timeline
-            </button>
-            <button
-              onClick={() => setViewMode("flowchart")}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                viewMode === "flowchart"
-                  ? "bg-purple-600 text-white font-semibold shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <GitCommitHorizontal className="w-3.5 h-3.5" />
-              Stage Flowchart
-            </button>
-            <button
-              onClick={() => setViewMode("both")}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                viewMode === "both"
-                  ? "bg-purple-600 text-white font-semibold shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              Combined View
-            </button>
-          </div>
         </div>
       </header>
 
@@ -105,24 +68,35 @@ export function StakeholderShareView({
               <thead>
                 <tr className="border-b border-slate-200 text-[11px] font-mono uppercase text-slate-600 bg-slate-50 font-semibold">
                   <th className="py-2.5 px-4">Feature</th>
-                  <th className="py-2.5 px-4">1. Where is it?</th>
-                  <th className="py-2.5 px-4">2. Who is working on it?</th>
-                  <th className="py-2.5 px-4">3. Target Date</th>
-                  <th className="py-2.5 px-4">4. Expected Date</th>
+                  <th className="py-2.5 px-4">Stage</th>
+                  <th className="py-2.5 px-4">Current Owner</th>
+                  <th className="py-2.5 px-4">Target</th>
+                  <th className="py-2.5 px-4">Projected</th>
                   <th className="py-2.5 px-4">Deliverable Links</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200/80">
                 {project.features.map((feat) => (
-                  <tr key={feat.id} className="hover:bg-slate-50/70 transition">
+                  <tr
+                    key={feat.id}
+                    onClick={() => {
+                      const el = document.getElementById(`feature-card-${feat.id}`);
+                      if (el) {
+                        el.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }
+                    }}
+                    className="hover:bg-slate-50/70 cursor-pointer transition group"
+                  >
                     <td className="py-3 px-4 font-bold text-slate-900">
-                      <div>{feat.title}</div>
+                      <div className="group-hover:text-purple-600 transition-colors">
+                        {feat.title}
+                      </div>
                       <div className="text-xs text-slate-500 font-normal">
                         {feat.summary}
                       </div>
                     </td>
                     <td className="py-3 px-4">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold whitespace-nowrap">
                         {feat.fourQuestions.where.stageName} (
                         {feat.fourQuestions.where.percentComplete}%)
                       </span>
@@ -130,18 +104,18 @@ export function StakeholderShareView({
                     <td className="py-3 px-4 text-xs text-slate-700 font-medium">
                       {feat.fourQuestions.who}
                     </td>
-                    <td className="py-3 px-4 font-mono text-xs text-slate-600 font-semibold">
+                    <td className="py-3 px-4 font-mono text-xs text-slate-600 font-semibold whitespace-nowrap">
                       {feat.fourQuestions.whenWantDone || "—"}
                     </td>
                     <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs text-slate-900 font-bold">
+                      <div className="flex items-center gap-2 whitespace-nowrap">
+                        <span className="font-mono text-xs text-slate-900 font-bold shrink-0">
                           {feat.fourQuestions.whenExpectDone || "—"}
                         </span>
                         <ScheduleHealthBadge feature={feat} />
                       </div>
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
                       <div className="flex flex-wrap gap-1.5">
                         {feat.links.map((l) => (
                           <LinkBadge key={l.id} link={l} />
@@ -160,10 +134,54 @@ export function StakeholderShareView({
 
         {/* Read-Only Feature Flowchart & Gantt Cards */}
         <div className="space-y-6">
+          {/* Display Options at top of actual charts */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
+            <h2 className="text-xs font-mono uppercase tracking-wider text-slate-700 font-bold flex items-center gap-2">
+              <Layers className="w-4 h-4 text-purple-600" />
+              Feature Views &amp; Schedules
+            </h2>
+            <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 shadow-2xs self-start sm:self-auto">
+              <button
+                onClick={() => setViewMode("gantt")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                  viewMode === "gantt"
+                    ? "bg-purple-600 text-white font-semibold shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                Gantt Timeline
+              </button>
+              <button
+                onClick={() => setViewMode("flowchart")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                  viewMode === "flowchart"
+                    ? "bg-purple-600 text-white font-semibold shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <GitCommitHorizontal className="w-3.5 h-3.5" />
+                Stage Flowchart
+              </button>
+              <button
+                onClick={() => setViewMode("both")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                  viewMode === "both"
+                    ? "bg-purple-600 text-white font-semibold shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                Combined View
+              </button>
+            </div>
+          </div>
+
           {project.features.map((feature) => (
             <section
               key={feature.id}
-              className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs hover:shadow-sm transition"
+              id={`feature-card-${feature.id}`}
+              className="scroll-mt-6 bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs hover:shadow-sm transition"
             >
               <div className="px-5 py-4 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-4">
                 <div>

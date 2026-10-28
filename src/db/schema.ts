@@ -183,3 +183,45 @@ export const activityLogs = pgTable("activity_logs", {
   details: text("details").notNull().default(""),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+export const projectCollaborators = pgTable("project_collaborators", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  role: text("role").notNull().default("editor"), // "owner" | "editor"
+  invitedBy: text("invited_by").references(() => users.id, { onDelete: "set null" }),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+});
+
+export const projectInvites = pgTable("project_invites", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  code: text("code").notNull().unique(), // e.g. "KZ-7X9B2"
+  createdBy: text("created_by")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  isActive: boolean("is_active").notNull().default(true),
+  usesCount: integer("uses_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const projectAccessRequests = pgTable("project_access_requests", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("pending"), // pending | approved | rejected
+  reviewedBy: text("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  reviewedAt: timestamp("reviewed_at"),
+});
+

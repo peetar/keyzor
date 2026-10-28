@@ -13,9 +13,28 @@ function getBaseUrl(req: Request): string {
   return `${proto}://${host}`;
 }
 
+import { auth as getSessionAuth } from "@/auth";
+import { DEFAULT_USER_ID } from "@/db";
+
+async function resolveCaller(req: Request): Promise<{ userId: string }> {
+  const authHeader = req.headers.get("authorization");
+  if (authHeader) {
+    const agentAuth = await authenticateAgentRequest(authHeader);
+    if (agentAuth.valid && agentAuth.userId) {
+      return { userId: agentAuth.userId };
+    }
+  }
+  const session = await getSessionAuth();
+  if (session?.user?.id) {
+    return { userId: session.user.id };
+  }
+  return { userId: DEFAULT_USER_ID };
+}
+
 export async function GET(req: Request) {
   const baseUrl = getBaseUrl(req);
-  const projects = await listProjects();
+  const caller = await resolveCaller(req);
+  const projects = await listProjects(caller.userId);
 
   return respondInstructional(
     req,
@@ -75,11 +94,13 @@ export async function POST(req: Request) {
     }
 
     const baseUrl = getBaseUrl(req);
+    const caller = await resolveCaller(req);
     const project = await createProject({
       name: body.name,
       description: body.description,
       slug: body.slug,
       defaultStages: body.defaultStages,
+      ownerId: caller.userId,
       actorName: body.actorName || (auth.valid ? auth.keyName : "Architect"),
       actorType: body.actorType || (auth.valid ? "agent" : "human"),
     });

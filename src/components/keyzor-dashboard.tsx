@@ -30,6 +30,15 @@ import {
   LogOut,
   KeyRound,
   Sparkles,
+  Users,
+  Trash2,
+  Edit2,
+  AlertCircle,
+  CheckCircle2,
+  UserPlus,
+  UserCheck,
+  UserX,
+  Lock,
 } from "lucide-react";
 
 interface KeyzorDashboardProps {
@@ -37,6 +46,7 @@ interface KeyzorDashboardProps {
   defaultApiKey: string;
   userEmail: string;
   userName: string;
+  currentUserId?: string;
 }
 
 export function KeyzorDashboard({
@@ -44,6 +54,7 @@ export function KeyzorDashboard({
   defaultApiKey,
   userEmail,
   userName,
+  currentUserId,
 }: KeyzorDashboardProps) {
   const [projects, setProjects] = useState<EnrichedProject[]>(initialProjects);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
@@ -60,6 +71,23 @@ export function KeyzorDashboard({
   const [showShareModal, setShowShareModal] = useState(false);
   const [showNewFeatureModal, setShowNewFeatureModal] = useState(false);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+
+  // Sharing & Collaboration Modals & State
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [joinModalTab, setJoinModalTab] = useState<"code" | "request">("code");
+  const [joinCodeInput, setJoinCodeInput] = useState("");
+  const [requestSlugInput, setRequestSlugInput] = useState("");
+  const [joinMessage, setJoinMessage] = useState<string | null>(null);
+  const [joinErrorMessage, setJoinErrorMessage] = useState<string | null>(null);
+
+  const [shareModalTab, setShareModalTab] = useState<
+    "collaborate" | "members" | "requests" | "stakeholder"
+  >("collaborate");
+
+  // Project Rename & Delete
+  const [isEditingProjectName, setIsEditingProjectName] = useState(false);
+  const [editProjectNameInput, setEditProjectNameInput] = useState("");
+  const [showDeleteProjectConfirm, setShowDeleteProjectConfirm] = useState(false);
 
   // Active stage/feature quick editor
   const [editingFeature, setEditingFeature] = useState<EnrichedFeature | null>(
@@ -310,6 +338,162 @@ export function KeyzorDashboard({
     }
   };
 
+  const isOwner = currentProject?.userRole === "owner";
+
+  const handleJoinWithCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!joinCodeInput.trim()) return;
+    setIsLoading(true);
+    setJoinErrorMessage(null);
+    setJoinMessage(null);
+    try {
+      const res = await fetch("/api/v1/projects/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: joinCodeInput.trim() }),
+      });
+      const json = await res.json();
+      if (res.ok && json.ok) {
+        setJoinMessage(json.data.message || "Successfully joined project!");
+        setJoinCodeInput("");
+        await refreshProjects(json.data.project.id);
+        setTimeout(() => {
+          setShowJoinModal(false);
+          setJoinMessage(null);
+        }, 1500);
+      } else {
+        setJoinErrorMessage(json.error || "Failed to join project.");
+      }
+    } catch (err) {
+      setJoinErrorMessage((err as Error).message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRequestAccess = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!requestSlugInput.trim()) return;
+    setIsLoading(true);
+    setJoinErrorMessage(null);
+    setJoinMessage(null);
+    try {
+      const slug = requestSlugInput.trim().toLowerCase();
+      const res = await fetch(`/api/v1/projects/${slug}/access-requests`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const json = await res.json();
+      if (res.ok && json.ok) {
+        setJoinMessage(json.data.message || "Request submitted successfully!");
+        setRequestSlugInput("");
+      } else {
+        setJoinErrorMessage(json.error || "Failed to request access.");
+      }
+    } catch (err) {
+      setJoinErrorMessage((err as Error).message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRotateInviteCode = async () => {
+    if (!currentProject) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch(
+        `/api/v1/projects/${currentProject.slug}/invites`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rotate: true }),
+        }
+      );
+      if (res.ok) {
+        await refreshProjects(currentProject.id);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleReviewRequest = async (
+    requestId: string,
+    status: "approved" | "rejected"
+  ) => {
+    if (!currentProject) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch(
+        `/api/v1/projects/${currentProject.slug}/access-requests/${requestId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        }
+      );
+      if (res.ok) {
+        await refreshProjects(currentProject.id);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRemoveCollaborator = async (targetUserId: string) => {
+    if (!currentProject) return;
+    if (!confirm("Are you sure you want to remove this collaborator?")) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch(
+        `/api/v1/projects/${currentProject.slug}/collaborators/${targetUserId}`,
+        {
+          method: "DELETE",
+        }
+      );
+      if (res.ok) {
+        await refreshProjects(currentProject.id);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRenameProject = async () => {
+    if (!currentProject || !editProjectNameInput.trim()) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/v1/projects/${currentProject.slug}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editProjectNameInput.trim() }),
+      });
+      if (res.ok) {
+        setIsEditingProjectName(false);
+        await refreshProjects(currentProject.id);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    if (!currentProject) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/v1/projects/${currentProject.slug}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setShowDeleteProjectConfirm(false);
+        await refreshProjects();
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const origin =
     typeof window !== "undefined"
       ? window.location.origin
@@ -318,6 +502,10 @@ export function KeyzorDashboard({
   const shareUrl = currentProject
     ? `${origin}/share/${encodeURIComponent(currentProject.encryptedShareToken)}`
     : "";
+
+  const inviteUrl = currentProject?.inviteCode
+    ? `${origin}/join?code=${currentProject.inviteCode}`
+    : `${origin}/join`;
 
   const agentOnboardingPrompt = `Fetch ${origin}/hello?format=skill&key=${activeApiKey} and save the returned instructions as your KEYZOR skill (SKILL.md). Whenever we brainstorm a new feature, finish a design.md, demo a prototype, or open a PR, ask me: "Would you like to update the KEYZOR flowchart?"`;
 
@@ -372,6 +560,18 @@ export function KeyzorDashboard({
               >
                 <Plus className="w-4 h-4" />
               </button>
+              <button
+                onClick={() => {
+                  setJoinErrorMessage(null);
+                  setJoinMessage(null);
+                  setShowJoinModal(true);
+                }}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 hover:text-slate-900 text-xs font-semibold transition shadow-2xs"
+                title="Join Project with Code or Request Access"
+              >
+                <UserPlus className="w-3.5 h-3.5 text-indigo-600" />
+                <span className="hidden sm:inline">Join</span>
+              </button>
             </div>
           </div>
 
@@ -386,14 +586,20 @@ export function KeyzorDashboard({
               <span>Agent Skill (/hello)</span>
             </button>
 
-            {/* Encrypted Stakeholder Share Link Button */}
+            {/* Share & Collaborate Button */}
             <button
-              onClick={() => setShowShareModal(true)}
+              onClick={() => {
+                setShareModalTab("collaborate");
+                setShowShareModal(true);
+              }}
               disabled={!currentProject}
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 border border-purple-300 text-purple-800 text-xs font-semibold transition shadow-2xs disabled:opacity-50 disabled:pointer-events-none"
+              className="relative inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-800 text-xs font-semibold transition shadow-2xs disabled:opacity-50 disabled:pointer-events-none"
             >
-              <Share2 className="w-3.5 h-3.5 text-purple-600" />
-              <span>Stakeholder Share Link</span>
+              <Users className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Share &amp; Collaborate</span>
+              {currentProject?.pendingRequestsCount && currentProject.pendingRequestsCount > 0 ? (
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping absolute -top-0.5 -right-0.5" />
+              ) : null}
             </button>
 
             {/* New Feature Flowchart Button */}
@@ -455,25 +661,246 @@ export function KeyzorDashboard({
           <>
             {/* Project Header & View Mode Toggle */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h1 className="text-xl font-bold text-slate-900">
-                  {currentProject.name}
-                </h1>
-                <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200 font-medium">
-                  /{currentProject.slug}
+              <div>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {isEditingProjectName ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={editProjectNameInput}
+                        onChange={(e) => setEditProjectNameInput(e.target.value)}
+                        className="text-lg font-bold text-slate-900 border border-indigo-400 rounded-lg px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        placeholder="Project name"
+                        autoFocus
+                      />
+                      <button
+                        onClick={handleRenameProject}
+                        className="px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 shadow-2xs"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setIsEditingProjectName(false)}
+                        className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-xs font-semibold hover:bg-slate-200"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-xl font-bold text-slate-900">
+                        {currentProject.name}
+                      </h1>
+                      {isOwner && (
+                        <button
+                          onClick={() => {
+                            setEditProjectNameInput(currentProject.name);
+                            setIsEditingProjectName(true);
+                          }}
+                          className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-slate-100 transition"
+                          title="Rename Project (Owner Only)"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200 font-medium">
+                    /{currentProject.slug}
+                  </span>
+
+                  {isOwner ? (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
+                      Owner
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200">
+                      Collaborator
+                    </span>
+                  )}
+
+                  {currentProject.pendingRequestsCount && currentProject.pendingRequestsCount > 0 ? (
+                    <button
+                      onClick={() => {
+                        setShareModalTab("requests");
+                        setShowShareModal(true);
+                      }}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 animate-pulse hover:bg-rose-100 transition"
+                    >
+                      <UserCheck className="w-3 h-3 text-rose-600" />
+                      <span>
+                        {currentProject.pendingRequestsCount} Request
+                        {currentProject.pendingRequestsCount > 1 ? "s" : ""}
+                      </span>
+                    </button>
+                  ) : null}
+
+                  {isOwner && (
+                    <button
+                      onClick={() => setShowDeleteProjectConfirm(true)}
+                      className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition ml-1"
+                      title="Delete Project (Owner Only)"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+                {currentProject.description && (
+                  <p className="text-sm text-slate-500 mt-1">
+                    {currentProject.description}
+                  </p>
+                )}
+              </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-2 self-start md:self-auto">
+              <button
+                onClick={() => refreshProjects(currentProject.id)}
+                className="p-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 hover:text-indigo-600 transition shadow-2xs"
+                title="Refresh latest AI agent updates"
+              >
+                <RefreshCw
+                  className={`w-4 h-4 ${isLoading ? "animate-spin text-indigo-600" : ""}`}
+                />
+              </button>
+            </div>
+          </div>
+
+        {/* Executive Overview Summary Table */}
+        {currentProject && currentProject.features.length > 0 && (
+          <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
+            <div className="px-5 py-3 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-indigo-600" />
+                <h2 className="text-xs font-mono uppercase tracking-wider text-slate-800 font-bold">
+                  Executive Overview
+                </h2>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-[11px] font-mono uppercase text-slate-600 bg-slate-50 font-semibold">
+                    <th className="py-2.5 px-4">Feature</th>
+                    <th className="py-2.5 px-4">Stage</th>
+                    <th className="py-2.5 px-4">Current Owner</th>
+                    <th className="py-2.5 px-4">Target</th>
+                    <th className="py-2.5 px-4">Projected</th>
+                    <th className="py-2.5 px-4">Key Links</th>
+                    <th className="py-2.5 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200/80">
+                  {currentProject.features.map((feat) => (
+                    <tr
+                      key={feat.id}
+                      onClick={() => {
+                        const el = document.getElementById(`feature-card-${feat.id}`);
+                        if (el) {
+                          el.scrollIntoView({ behavior: "smooth", block: "start" });
+                        }
+                      }}
+                      className="hover:bg-slate-50/80 cursor-pointer transition group"
+                    >
+                      <td className="py-3 px-4 font-bold text-slate-900">
+                        <div className="group-hover:text-indigo-600 transition-colors">
+                          {feat.title}
+                        </div>
+                        <div className="text-xs text-slate-500 font-normal truncate max-w-xs">
+                          {feat.summary}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold">
+                          <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0" />
+                          <span className="whitespace-nowrap">{feat.fourQuestions.where.stageName}</span>
+                          <span className="text-slate-500 font-mono text-[11px] whitespace-nowrap">
+                            ({feat.fourQuestions.where.stageIndex + 1}/
+                            {feat.fourQuestions.where.totalStages})
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-xs text-slate-700 font-medium">
+                        {feat.fourQuestions.who}
+                      </td>
+                      <td className="py-3 px-4 font-mono text-xs text-slate-600 font-semibold whitespace-nowrap">
+                        {feat.fourQuestions.whenWantDone || "—"}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2 whitespace-nowrap">
+                          <span className="font-mono text-xs text-slate-900 font-bold shrink-0">
+                            {feat.fourQuestions.whenExpectDone || "—"}
+                          </span>
+                          <ScheduleHealthBadge feature={feat} />
+                        </div>
+                      </td>
+                      <td
+                        className="py-3 px-4"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex flex-wrap gap-1.5">
+                          {feat.links.slice(0, 2).map((l) => (
+                            <LinkBadge key={l.id} link={l} />
+                          ))}
+                          {feat.links.length === 0 && (
+                            <span className="text-xs text-slate-400">None</span>
+                          )}
+                        </div>
+                      </td>
+                      <td
+                        className="py-3 px-4 text-right"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          onClick={() => openEditor(feat)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-700 shadow-2xs hover:border-indigo-300 hover:text-indigo-600 transition"
+                          title="Edit feature stage & dates"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                          <span>Edit</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Feature Cards with Flowchart / Gantt Views */}
+        {currentProject.features.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-10 text-center bg-white border border-slate-200/90 rounded-2xl shadow-xs space-y-3">
+            <h3 className="text-base font-bold text-slate-900">
+              No feature flows yet
+            </h3>
+            <p className="text-xs text-slate-500 max-w-sm">
+              Add your first feature flowchart to start tracking development lifecycle stages.
+            </p>
+            <button
+              onClick={() => setShowNewFeatureModal(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition"
+            >
+              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>Add Feature Flow</span>
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Display Preference Toggle: at top of actual charts */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-indigo-600" />
+                <h2 className="text-xs font-mono uppercase tracking-wider text-slate-800 font-bold">
+                  Feature Flows &amp; Timelines
+                </h2>
+                <span className="text-xs font-mono text-slate-400">
+                  ({currentProject.features.length} feature{currentProject.features.length === 1 ? "" : "s"})
                 </span>
               </div>
-              {currentProject.description && (
-                <p className="text-sm text-slate-500 mt-1">
-                  {currentProject.description}
-                </p>
-              )}
-            </div>
 
-            {/* Display Preference Toggle: Flowchart vs Gantt vs Split */}
-            <div className="flex items-center gap-2 self-start md:self-auto">
-              <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 shadow-2xs">
+              <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 shadow-2xs self-start sm:self-auto">
                 <button
                   onClick={() => setViewMode("gantt")}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
@@ -508,123 +935,13 @@ export function KeyzorDashboard({
                   Combined View
                 </button>
               </div>
-
-              <button
-                onClick={() => refreshProjects(currentProject.id)}
-                className="p-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 hover:text-indigo-600 transition shadow-2xs"
-                title="Refresh latest AI agent updates"
-              >
-                <RefreshCw
-                  className={`w-4 h-4 ${isLoading ? "animate-spin text-indigo-600" : ""}`}
-                />
-              </button>
             </div>
-          </div>
 
-        {/* At-A-Glance 4 Core Questions Summary Matrix */}
-        {currentProject && currentProject.features.length > 0 && (
-          <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
-            <div className="px-5 py-3 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-indigo-600" />
-                <h2 className="text-xs font-mono uppercase tracking-wider text-slate-800 font-bold">
-                  Executive Overview
-                </h2>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 text-[11px] font-mono uppercase text-slate-600 bg-slate-50 font-semibold">
-                    <th className="py-2.5 px-4">Feature</th>
-                    <th className="py-2.5 px-4">1. Where is it? (Stage)</th>
-                    <th className="py-2.5 px-4">2. Who is working on it?</th>
-                    <th className="py-2.5 px-4">3. Want Done (Target)</th>
-                    <th className="py-2.5 px-4">4. Expect Done (Projected)</th>
-                    <th className="py-2.5 px-4">Key Links</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200/80">
-                  {currentProject.features.map((feat) => (
-                    <tr
-                      key={feat.id}
-                      onClick={() => openEditor(feat)}
-                      className="hover:bg-slate-50/80 cursor-pointer transition"
-                    >
-                      <td className="py-3 px-4 font-bold text-slate-900">
-                        <div>{feat.title}</div>
-                        <div className="text-xs text-slate-500 font-normal truncate max-w-xs">
-                          {feat.summary}
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold">
-                          <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                          {feat.fourQuestions.where.stageName}
-                          <span className="text-slate-500 font-mono text-[11px]">
-                            ({feat.fourQuestions.where.stageIndex + 1}/
-                            {feat.fourQuestions.where.totalStages})
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 text-xs text-slate-700 font-medium">
-                        {feat.fourQuestions.who}
-                      </td>
-                      <td className="py-3 px-4 font-mono text-xs text-slate-600 font-semibold">
-                        {feat.fourQuestions.whenWantDone || "—"}
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs text-slate-900 font-bold">
-                            {feat.fourQuestions.whenExpectDone || "—"}
-                          </span>
-                          <ScheduleHealthBadge feature={feat} />
-                        </div>
-                      </td>
-                      <td
-                        className="py-3 px-4"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div className="flex flex-wrap gap-1.5">
-                          {feat.links.slice(0, 2).map((l) => (
-                            <LinkBadge key={l.id} link={l} />
-                          ))}
-                          {feat.links.length === 0 && (
-                            <span className="text-xs text-slate-400">None</span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Feature Cards with 4 Questions + Flowchart / Gantt Views */}
-        {currentProject.features.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-10 text-center bg-white border border-slate-200/90 rounded-2xl shadow-xs space-y-3">
-            <h3 className="text-base font-bold text-slate-900">
-              No feature flows yet
-            </h3>
-            <p className="text-xs text-slate-500 max-w-sm">
-              Add your first feature flowchart to start tracking development lifecycle stages.
-            </p>
-            <button
-              onClick={() => setShowNewFeatureModal(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition"
-            >
-              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Add Feature Flow</span>
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-6">
             {currentProject.features.map((feature) => (
             <section
               key={feature.id}
-              className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition"
+              id={`feature-card-${feature.id}`}
+              className="scroll-mt-6 bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition"
             >
               {/* Feature Title & Quick Links Bar */}
               <div className="px-5 py-4 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-4">
@@ -764,10 +1081,10 @@ export function KeyzorDashboard({
             </div>
 
             <form onSubmit={handleSaveFeatureUpdate} className="space-y-4">
-              {/* 1. Where is this feature? */}
+              {/* Stage */}
               <div>
                 <label className="block text-xs font-mono uppercase text-slate-600 font-semibold mb-1.5">
-                  1. Where is this feature? (Active Flowchart Stage)
+                  Stage
                 </label>
                 <select
                   value={editingStageId}
@@ -797,10 +1114,10 @@ export function KeyzorDashboard({
                 </select>
               </div>
 
-              {/* 2. Who is working on it? */}
+              {/* Current Owner */}
               <div>
                 <label className="block text-xs font-mono uppercase text-slate-600 font-semibold mb-1.5">
-                  2. Who is working on it? (Current Owner / Team / Agent)
+                  Current Owner
                 </label>
                 <input
                   type="text"
@@ -811,11 +1128,11 @@ export function KeyzorDashboard({
                 />
               </div>
 
-              {/* 3 & 4: When do we want it done? / When do we expect it done? */}
+              {/* Target & Projected Dates */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-mono uppercase text-slate-600 font-semibold mb-1.5">
-                    3. When do we want it done?
+                    Target Date
                   </label>
                   <input
                     type="date"
@@ -826,7 +1143,7 @@ export function KeyzorDashboard({
                 </div>
                 <div>
                   <label className="block text-xs font-mono uppercase text-slate-600 font-semibold mb-1.5">
-                    4. When do we expect it done?
+                    Projected Date
                   </label>
                   <input
                     type="date"
@@ -1065,19 +1382,19 @@ export function KeyzorDashboard({
         </div>
       )}
 
-      {/* MODAL 3: Encrypted Stakeholder Share Link Modal */}
+      {/* MODAL 3: Share & Collaborate Modal */}
       {showShareModal && currentProject && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-5">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-purple-600" />
+                <Users className="w-5 h-5 text-indigo-600" />
                 <div>
-                  <span className="text-[11px] font-mono uppercase text-purple-700 font-bold">
-                    AES-256-GCM Encrypted Stakeholder Link
+                  <span className="text-[11px] font-mono uppercase text-indigo-700 font-bold">
+                    Project Sharing &amp; Collaboration
                   </span>
                   <h3 className="text-lg font-bold text-slate-900">
-                    Read-Only Presentation &amp; Stakeholder View
+                    {currentProject.name}
                   </h3>
                 </div>
               </div>
@@ -1089,80 +1406,335 @@ export function KeyzorDashboard({
               </button>
             </div>
 
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Share this encrypted link with your CEO, client, or external dev leads so they can view the live{" "}
-              <strong className="text-slate-900">Gantt Chart</strong>,{" "}
-              <strong className="text-slate-900">Stage Flowchart</strong>, and{" "}
-              <strong className="text-slate-900">4 Core Questions</strong> in read-only presentation mode without needing an account.
-            </p>
+            {/* Modal Navigation Tabs */}
+            <div className="flex border-b border-slate-200 gap-1 pb-1">
+              <button
+                onClick={() => setShareModalTab("collaborate")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                  shareModalTab === "collaborate"
+                    ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Invite Link &amp; Code</span>
+              </button>
+              <button
+                onClick={() => setShareModalTab("members")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                  shareModalTab === "members"
+                    ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>
+                  Team ({currentProject.collaborators?.length || 1})
+                </span>
+              </button>
+              {isOwner && (
+                <button
+                  onClick={() => setShareModalTab("requests")}
+                  className={`relative px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                    shareModalTab === "requests"
+                      ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <UserCheck className="w-3.5 h-3.5" />
+                  <span>Requests ({currentProject.pendingRequestsCount || 0})</span>
+                  {currentProject.pendingRequestsCount && currentProject.pendingRequestsCount > 0 ? (
+                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping absolute top-1 right-1" />
+                  ) : null}
+                </button>
+              )}
+              <button
+                onClick={() => setShareModalTab("stakeholder")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                  shareModalTab === "stakeholder"
+                    ? "bg-purple-50 text-purple-700 border border-purple-200"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
+                <span>Stakeholder Link</span>
+              </button>
+            </div>
 
-            {currentProject.shareEnabled ? (
-              <div className="p-3.5 rounded-xl bg-purple-50/60 border border-purple-200 space-y-2.5">
-                <div className="text-[11px] font-mono text-purple-900 font-bold flex items-center justify-between">
-                  <span>ENCRYPTED SHARE URL (ACTIVE)</span>
-                  <a
-                    href={shareUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-indigo-600 hover:underline font-semibold"
-                  >
-                    Preview Stakeholder View <ExternalLink className="w-3 h-3" />
-                  </a>
+            {/* TAB 1: Invite Collaborators */}
+            {shareModalTab === "collaborate" && (
+              <div className="space-y-4">
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Invite other architects and developers to collaborate on this project. Collaborators can create features, update stages, link design docs, and connect their own AI coding agents.
+                </p>
+
+                <div className="p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-200 space-y-3">
+                  <div>
+                    <div className="text-[11px] font-mono text-indigo-900 font-bold mb-1">
+                      DIRECT INVITE LINK (SLACK / EMAIL)
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={inviteUrl}
+                        className="flex-1 bg-white border border-indigo-200 rounded-lg px-3 py-2 text-xs font-mono text-slate-800 shadow-2xs"
+                      />
+                      <button
+                        onClick={() => copyText(inviteUrl, "invite-url")}
+                        className="px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs inline-flex items-center gap-1.5 shrink-0 shadow-xs"
+                      >
+                        {copiedId === "invite-url" ? (
+                          <>
+                            <Check className="w-3.5 h-3.5" /> Copied
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" /> Copy Link
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-indigo-100 flex items-center justify-between">
+                    <div>
+                      <div className="text-[11px] font-mono text-indigo-900 font-bold">
+                        PROJECT SHORT CODE
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        Teammates can paste this into &ldquo;Join Project&rdquo;
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-sm text-indigo-800 bg-white px-3 py-1.5 rounded-lg border border-indigo-200 tracking-wider">
+                        {currentProject.inviteCode || "KZ-..."}
+                      </span>
+                      <button
+                        onClick={() =>
+                          copyText(currentProject.inviteCode || "", "invite-code")
+                        }
+                        className="p-1.5 rounded-lg bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 text-xs font-semibold shadow-2xs"
+                        title="Copy Code"
+                      >
+                        {copiedId === "invite-code" ? (
+                          <Check className="w-3.5 h-3.5" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={shareUrl}
-                    className="flex-1 bg-white border border-purple-200 rounded-lg px-3 py-2 text-xs font-mono text-slate-800 shadow-2xs"
-                  />
-                  <button
-                    onClick={() => copyText(shareUrl, "share-url")}
-                    className="px-3.5 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs inline-flex items-center gap-1.5 shrink-0 shadow-xs"
-                  >
-                    {copiedId === "share-url" ? (
-                      <>
-                        <Check className="w-3.5 h-3.5" /> Copied
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" /> Copy Link
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 font-medium">
-                Read-only stakeholder sharing is currently disabled for this project. All encrypted links are blocked.
+
+                {isOwner && (
+                  <div className="flex justify-between items-center pt-2">
+                    <button
+                      onClick={handleRotateInviteCode}
+                      className="px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-xs font-semibold text-amber-800 border border-amber-300 shadow-2xs"
+                      title="Deactivates current code and generates a new random code"
+                    >
+                      Rotate Invite Code
+                    </button>
+                    <span className="text-[11px] text-slate-400">
+                      Only project owner can rotate
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200">
-              <div className="flex gap-2">
-                <button
-                  onClick={() =>
-                    handleShareSettings({
-                      shareEnabled: !currentProject.shareEnabled,
-                    })
-                  }
-                  className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 border border-slate-300 shadow-2xs"
-                >
-                  {currentProject.shareEnabled
-                    ? "Disable Share Link"
-                    : "Enable Share Link"}
-                </button>
-                <button
-                  onClick={() => handleShareSettings({ rotateToken: true })}
-                  className="px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-xs font-semibold text-amber-800 border border-amber-300 shadow-2xs"
-                  title="Generates a new AES-256-GCM encrypted link and immediately invalidates old links"
-                >
-                  Rotate &amp; Revoke Old Link
-                </button>
+            {/* TAB 2: Team Members */}
+            {shareModalTab === "members" && (
+              <div className="space-y-3 max-h-72 overflow-y-auto">
+                <p className="text-xs text-slate-600">
+                  Active members collaborating on this project:
+                </p>
+                <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+                  {currentProject.collaborators &&
+                  currentProject.collaborators.length > 0 ? (
+                    currentProject.collaborators.map((c) => (
+                      <div
+                        key={c.id}
+                        className="p-3 bg-white flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-700 uppercase">
+                            {c.name.slice(0, 2) || "CO"}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-slate-900">
+                              {c.name}
+                            </div>
+                            <div className="text-[11px] text-slate-400">
+                              {c.email || "Collaborator"}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
+                              c.role === "owner"
+                                ? "bg-amber-50 text-amber-800 border-amber-200"
+                                : "bg-blue-50 text-blue-800 border-blue-200"
+                            }`}
+                          >
+                            {c.role === "owner" ? "Owner" : "Editor"}
+                          </span>
+                          {isOwner && c.role !== "owner" && (
+                            <button
+                              onClick={() => handleRemoveCollaborator(c.userId)}
+                              className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                              title="Remove Collaborator"
+                            >
+                              <UserX className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-4 text-center text-xs text-slate-400">
+                      No collaborators found.
+                    </div>
+                  )}
+                </div>
               </div>
+            )}
+
+            {/* TAB 3: Access Requests */}
+            {shareModalTab === "requests" && isOwner && (
+              <div className="space-y-3 max-h-72 overflow-y-auto">
+                <p className="text-xs text-slate-600">
+                  Users who requested access to this project:
+                </p>
+                {currentProject.pendingRequests &&
+                currentProject.pendingRequests.length > 0 ? (
+                  <div className="space-y-2">
+                    {currentProject.pendingRequests.map((req) => (
+                      <div
+                        key={req.id}
+                        className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div>
+                          <div className="font-semibold text-slate-900">
+                            {req.userName}
+                          </div>
+                          <div className="text-[11px] text-slate-500">
+                            {req.userEmail}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() =>
+                              handleReviewRequest(req.id, "approved")
+                            }
+                            className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-2xs"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() =>
+                              handleReviewRequest(req.id, "rejected")
+                            }
+                            className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 text-rose-700 border border-rose-200 font-semibold text-xs shadow-2xs"
+                          >
+                            Deny
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-6 text-center rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500">
+                    No pending access requests.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 4: Stakeholder Presentation Link */}
+            {shareModalTab === "stakeholder" && (
+              <div className="space-y-4">
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Share this encrypted link with your CEO, client, or external leads so they can view the live{" "}
+                  <strong className="text-slate-900">Gantt Chart</strong>,{" "}
+                  <strong className="text-slate-900">Stage Flowchart</strong>, and{" "}
+                  <strong className="text-slate-900">Executive Overview &amp; Milestones</strong> in read-only presentation mode without logging in.
+                </p>
+
+                {currentProject.shareEnabled ? (
+                  <div className="p-3.5 rounded-xl bg-purple-50/60 border border-purple-200 space-y-2.5">
+                    <div className="text-[11px] font-mono text-purple-900 font-bold flex items-center justify-between">
+                      <span>ENCRYPTED SHARE URL (ACTIVE)</span>
+                      <a
+                        href={shareUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-indigo-600 hover:underline font-semibold"
+                      >
+                        Preview Stakeholder View <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={shareUrl}
+                        className="flex-1 bg-white border border-purple-200 rounded-lg px-3 py-2 text-xs font-mono text-slate-800 shadow-2xs"
+                      />
+                      <button
+                        onClick={() => copyText(shareUrl, "share-url")}
+                        className="px-3.5 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs inline-flex items-center gap-1.5 shrink-0 shadow-xs"
+                      >
+                        {copiedId === "share-url" ? (
+                          <>
+                            <Check className="w-3.5 h-3.5" /> Copied
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" /> Copy Link
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 font-medium">
+                    Read-only stakeholder sharing is currently disabled for this project. All encrypted links are blocked.
+                  </div>
+                )}
+
+                {isOwner && (
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={() =>
+                        handleShareSettings({
+                          shareEnabled: !currentProject.shareEnabled,
+                        })
+                      }
+                      className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 border border-slate-300 shadow-2xs"
+                    >
+                      {currentProject.shareEnabled
+                        ? "Disable Share Link"
+                        : "Enable Share Link"}
+                    </button>
+                    <button
+                      onClick={() => handleShareSettings({ rotateToken: true })}
+                      className="px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-xs font-semibold text-amber-800 border border-amber-300 shadow-2xs"
+                      title="Generates a new AES-256-GCM encrypted link and immediately invalidates old links"
+                    >
+                      Rotate &amp; Revoke Old Link
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-end pt-3 border-t border-slate-200">
               <button
                 onClick={() => setShowShareModal(false)}
-                className="px-4 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-700 shadow-2xs"
+                className="px-4 py-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-700 shadow-2xs"
               >
                 Close
               </button>
@@ -1222,7 +1794,7 @@ export function KeyzorDashboard({
 
               <div>
                 <label className="block text-xs font-mono uppercase text-slate-600 font-semibold mb-1">
-                  Who is working on it? (Initial Owner)
+                  Current Owner
                 </label>
                 <input
                   type="text"
@@ -1235,7 +1807,7 @@ export function KeyzorDashboard({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-mono uppercase text-slate-600 font-semibold mb-1">
-                    When do we want it done?
+                    Target Date
                   </label>
                   <input
                     type="date"
@@ -1246,7 +1818,7 @@ export function KeyzorDashboard({
                 </div>
                 <div>
                   <label className="block text-xs font-mono uppercase text-slate-600 font-semibold mb-1">
-                    When do we expect it done?
+                    Projected Date
                   </label>
                   <input
                     type="date"
@@ -1345,6 +1917,180 @@ export function KeyzorDashboard({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 6: Join or Request Project */}
+      {showJoinModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-indigo-600" />
+                <h3 className="text-lg font-bold text-slate-900">
+                  Join or Request Project
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowJoinModal(false)}
+                className="p-1.5 rounded-lg bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Sub-tabs */}
+            <div className="flex border-b border-slate-200 gap-1 pb-1">
+              <button
+                onClick={() => {
+                  setJoinModalTab("code");
+                  setJoinErrorMessage(null);
+                  setJoinMessage(null);
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                  joinModalTab === "code"
+                    ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Enter Invite Code
+              </button>
+              <button
+                onClick={() => {
+                  setJoinModalTab("request");
+                  setJoinErrorMessage(null);
+                  setJoinMessage(null);
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                  joinModalTab === "request"
+                    ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Request Access by Slug
+              </button>
+            </div>
+
+            {joinMessage && (
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{joinMessage}</span>
+              </div>
+            )}
+
+            {joinErrorMessage && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{joinErrorMessage}</span>
+              </div>
+            )}
+
+            {joinModalTab === "code" ? (
+              <form onSubmit={handleJoinWithCode} className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-mono uppercase text-slate-600 font-semibold mb-1">
+                    Project Invite Code *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={joinCodeInput}
+                    onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
+                    placeholder="e.g. KZ-7X9B2"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs uppercase tracking-wider"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Ask the project owner for their 5-character project invite code.
+                  </p>
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowJoinModal(false)}
+                    className="px-4 py-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-700 shadow-2xs"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isLoading || !joinCodeInput.trim()}
+                    className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold shadow-xs"
+                  >
+                    {isLoading ? "Joining..." : "Join Project"}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleRequestAccess} className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-mono uppercase text-slate-600 font-semibold mb-1">
+                    Project Slug or ID *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={requestSlugInput}
+                    onChange={(e) => setRequestSlugInput(e.target.value)}
+                    placeholder="e.g. keyzor-product-roadmap"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    The project owner will receive an access request notification in their dashboard.
+                  </p>
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowJoinModal(false)}
+                    className="px-4 py-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-700 shadow-2xs"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isLoading || !requestSlugInput.trim()}
+                    className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold shadow-xs"
+                  >
+                    {isLoading ? "Submitting..." : "Submit Access Request"}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 7: Delete Project Confirmation */}
+      {showDeleteProjectConfirm && currentProject && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-rose-200 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-2.5 text-rose-600">
+              <Trash2 className="w-5 h-5 shrink-0" />
+              <h3 className="text-lg font-bold text-slate-900">
+                Delete Project &lsquo;{currentProject.name}&rsquo;?
+              </h3>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              This action is permanent and can only be performed by the project owner. It will permanently delete this project, all associated feature flowcharts, Gantt schedules, resource links, and access history.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteProjectConfirm(false)}
+                className="px-4 py-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-700 shadow-2xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteProject}
+                disabled={isLoading}
+                className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-xs"
+              >
+                {isLoading ? "Deleting..." : "Permanently Delete Project"}
+              </button>
+            </div>
           </div>
         </div>
       )}
