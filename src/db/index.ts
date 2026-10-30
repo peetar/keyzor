@@ -232,20 +232,32 @@ export async function ensureDatabaseReady(): Promise<void> {
       .delete(schema.users)
       .where(sql`email LIKE '%@example.com'`);
 
-    // Reconcile any legacy projects/API keys created under DEFAULT_USER_ID to the primary real OAuth user
-    const allUsers = await activeDb.select().from(schema.users);
-    const realUsers = allUsers.filter(
-      (u) => u.id !== DEFAULT_USER_ID && !isPlaceholderEmail(u.email)
-    );
-    const primaryOwner =
-      realUsers.find(
-        (u) =>
-          u.email.toLowerCase().includes("peter") ||
-          u.email.toLowerCase().includes("peetar") ||
-          u.name.toLowerCase().includes("peter") ||
-          u.name.toLowerCase().includes("peetar")
-      ) || (realUsers.length === 1 ? realUsers[0] : undefined);
+    // Reconcile any legacy projects/API keys created under DEFAULT_USER_ID or legacy tricepeter@gmail.com
+    // directly to the canonical GitHub OAuth account (peter.trice@gmail.com)
+    const canonicalEmail = "peter.trice@gmail.com";
+    let canonicalUserRows = await activeDb
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.email, canonicalEmail));
 
+    if (canonicalUserRows.length === 0) {
+      const canonicalId = "usr_peter_trice";
+      await activeDb
+        .insert(schema.users)
+        .values({
+          id: canonicalId,
+          email: canonicalEmail,
+          name: "Peter Trice",
+          provider: "github",
+        })
+        .onConflictDoNothing();
+      canonicalUserRows = await activeDb
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.email, canonicalEmail));
+    }
+
+    const primaryOwner = canonicalUserRows[0];
     if (primaryOwner) {
       await reconcileLegacyDefaultUserAssets(activeDb, primaryOwner.id);
     }
@@ -269,30 +281,55 @@ export async function reconcileLegacyDefaultUserAssets(
 ): Promise<void> {
   if (!targetUserId || targetUserId === DEFAULT_USER_ID) return;
 
-  await activeDb
-    .update(schema.projects)
-    .set({ ownerId: targetUserId })
-    .where(eq(schema.projects.ownerId, DEFAULT_USER_ID));
+  // Find any legacy duplicate user rows (DEFAULT_USER_ID or typo/legacy tricepeter@gmail.com)
+  const legacyUsers = await activeDb
+    .select()
+    .from(schema.users)
+    .where(
+      sql`id = ${DEFAULT_USER_ID} OR LOWER(email) IN ('tricepeter@gmail.com', 'trice.peter@gmail.com', 'architect@kazor.app', 'architect@keyzor.vercel.app')`
+    );
 
-  await activeDb
-    .update(schema.apiKeys)
-    .set({ userId: targetUserId })
-    .where(eq(schema.apiKeys.userId, DEFAULT_USER_ID));
+  const sourceUserIds = Array.from(
+    new Set([
+      DEFAULT_USER_ID,
+      ...legacyUsers.map((u) => u.id).filter((id) => id !== targetUserId),
+    ])
+  );
 
-  await activeDb
-    .update(schema.projectInvites)
-    .set({ createdBy: targetUserId })
-    .where(eq(schema.projectInvites.createdBy, DEFAULT_USER_ID));
+  for (const sourceId of sourceUserIds) {
+    if (sourceId === targetUserId) continue;
 
-  await activeDb
-    .update(schema.projectCollaborators)
-    .set({ invitedBy: targetUserId })
-    .where(eq(schema.projectCollaborators.invitedBy, DEFAULT_USER_ID));
+    await activeDb
+      .update(schema.projects)
+      .set({ ownerId: targetUserId })
+      .where(eq(schema.projects.ownerId, sourceId));
 
-  await activeDb
-    .update(schema.projectAccessRequests)
-    .set({ reviewedBy: targetUserId })
-    .where(eq(schema.projectAccessRequests.reviewedBy, DEFAULT_USER_ID));
+    await activeDb
+      .update(schema.apiKeys)
+      .set({ userId: targetUserId })
+      .where(eq(schema.apiKeys.userId, sourceId));
+
+    await activeDb
+      .update(schema.projectInvites)
+      .set({ createdBy: targetUserId })
+      .where(eq(schema.projectInvites.createdBy, sourceId));
+
+    await activeDb
+      .update(schema.projectCollaborators)
+      .set({ invitedBy: targetUserId })
+      .where(eq(schema.projectCollaborators.invitedBy, sourceId));
+
+    await activeDb
+      .update(schema.projectAccessRequests)
+      .set({ reviewedBy: targetUserId })
+      .where(eq(schema.projectAccessRequests.reviewedBy, sourceId));
+
+    if (sourceId !== DEFAULT_USER_ID) {
+      await activeDb
+        .delete(schema.users)
+        .where(eq(schema.users.id, sourceId));
+    }
+  }
 
   await activeDb.execute(sql`
     DELETE FROM project_collaborators

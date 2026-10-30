@@ -43,7 +43,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         (typeof profileAny?.login === "string"
           ? `${profileAny.login}@users.noreply.github.com`
           : undefined) ||
-        (typeof token?.sub === "string" && account?.provider === "github"
+        (typeof token?.sub === "string"
           ? `github_${token.sub}@users.noreply.github.com`
           : undefined);
 
@@ -65,7 +65,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         Boolean(user) ||
         !token.userId ||
         token.userId === "usr_architect_peter" ||
-        !token.migratedV2;
+        token.userId === "usr_8f2f12b903d2" ||
+        !token.migratedV3;
 
       if (resolvedEmail && needsSync) {
         try {
@@ -78,7 +79,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           token.userId = dbUser.id;
           token.email = dbUser.email;
           token.name = dbUser.name;
-          token.migratedV2 = true;
+          token.migratedV3 = true;
         } catch (e) {
           console.error("Error syncing user in auth jwt callback:", e);
         }
@@ -93,7 +94,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           session.user.email ||
           (typeof token?.email === "string" ? token.email : "");
 
-        if ((!resolvedUserId || resolvedUserId === "usr_architect_peter") && email) {
+        if (
+          (!resolvedUserId ||
+            resolvedUserId === "usr_architect_peter" ||
+            resolvedUserId === "usr_8f2f12b903d2") &&
+          email
+        ) {
           try {
             const dbUser = await getOrCreateUser({
               email,

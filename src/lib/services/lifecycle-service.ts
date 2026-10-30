@@ -3,8 +3,6 @@ import { eq, asc, desc, and, inArray, sql } from "drizzle-orm";
 import {
   db,
   ensureDatabaseReady,
-  DEFAULT_USER_ID,
-  isPlaceholderEmail,
   reconcileLegacyDefaultUserAssets,
 } from "@/db";
 import * as schema from "@/db/schema";
@@ -1163,7 +1161,15 @@ export async function getOrCreateUser(input: {
   provider: string;
 }> {
   await ensureDatabaseReady();
-  const normalizedEmail = input.email.trim().toLowerCase();
+  const rawNormalizedEmail = input.email.trim().toLowerCase();
+  const normalizedEmail = [
+    "tricepeter@gmail.com",
+    "trice.peter@gmail.com",
+    "peetar@users.noreply.github.com",
+  ].includes(rawNormalizedEmail)
+    ? "peter.trice@gmail.com"
+    : rawNormalizedEmail;
+
   const existing = await db
     .select()
     .from(schema.users)
@@ -1198,24 +1204,8 @@ export async function getOrCreateUser(input: {
     await db.insert(schema.users).values(user);
   }
 
-  if (user.id !== DEFAULT_USER_ID && !isPlaceholderEmail(user.email)) {
-    const isOwnerMatch =
-      user.email.toLowerCase().includes("peter") ||
-      user.email.toLowerCase().includes("peetar") ||
-      user.name.toLowerCase().includes("peter") ||
-      user.name.toLowerCase().includes("peetar");
-
-    if (isOwnerMatch) {
-      await reconcileLegacyDefaultUserAssets(db, user.id);
-    } else {
-      const allUsers = await db.select().from(schema.users);
-      const realUsers = allUsers.filter(
-        (u) => u.id !== DEFAULT_USER_ID && !isPlaceholderEmail(u.email)
-      );
-      if (realUsers.length === 1 && realUsers[0].id === user.id) {
-        await reconcileLegacyDefaultUserAssets(db, user.id);
-      }
-    }
+  if (user.email === "peter.trice@gmail.com") {
+    await reconcileLegacyDefaultUserAssets(db, user.id);
   }
 
   return user;
