@@ -57,13 +57,21 @@ Follow these 5 specific operational triggers:
 
 ---
 
-## 3. Authentication
+## 3. Authentication & Multi-Project Workspace Resolution
 
-Pass your registered KEYZOR API Key in the `Authorization` header on all write requests:
+Your KEYZOR API Key is **user-scoped**: it authenticates your user account and grants access to all projects where you are an Owner or Collaborator.
+
+Pass your registered KEYZOR API Key in the `Authorization` header on all requests:
 ```http
 Authorization: Bearer kz_live_eXKAXwwzMBuUyOhFgneldyw3
 Content-Type: application/json
 ```
+
+### Multi-Project Workspace Resolution (CRITICAL)
+Because a single user API key can access multiple projects across different codebases, you **MUST** ensure you are reading and updating the project that matches the user's current workspace:
+1. Inspect the current workspace directory name, `package.json` name, or `git remote -v` repository name (e.g., `kazor` / `keyzor` -> `keyzor-product-roadmap`, `OnehealthEHR` -> `onehealthehr`).
+2. Query `GET https://keyzor.vercel.app/api/v1/projects` and match the current workspace/repository to the corresponding `projectSlug`.
+3. **Never blindly default to the first project in the list** if it does not match the current repository. If no existing project matches the current repository, or if there is any ambiguity, ask the user which KEYZOR project to target (or offer to create a new project via `POST /api/v1/projects`).
 
 ---
 
@@ -73,13 +81,19 @@ Every endpoint returns an `agent_guidance` envelope telling you the current stat
 
 > **Tip for AI Agents:** You can use either the full ID (`feat_e70bc59839`) or the URL slug (`decouple-screening-from-registration-triage`) interchangeably in all `/api/v1/features/:idOrSlug` routes. Both `PATCH /api/v1/features/:idOrSlug` and `PATCH /api/v1/features/:idOrSlug/status` are supported.
 
-### A. List All Projects & Feature Summaries
+### A. List All Accessible Projects & Feature Summaries
 ```bash
 curl -s "https://keyzor.vercel.app/api/v1/projects" \
   -H "Authorization: Bearer kz_live_eXKAXwwzMBuUyOhFgneldyw3"
 ```
 
-### B. Create a New Feature Flowchart (or Batch-Create Multiple Features)
+### B. Inspect a Specific Project's Features & Stages
+```bash
+curl -s "https://keyzor.vercel.app/api/v1/projects/<projectSlug>" \
+  -H "Authorization: Bearer kz_live_eXKAXwwzMBuUyOhFgneldyw3"
+```
+
+### C. Create a New Feature Flowchart (or Batch-Create Multiple Features)
 You can omit `customStages` to use the project's default 7-stage Architect Lifecycle (`Brainstorming & Scope` → `Architecture & design.md` → `Handed Over to Dev` → `Prototype Demo` → `Deployed on Dev/Test` → `Bugfixes & Feedback` → `Live in Production`), OR pass `customStages` tailored to the feature!
 You can also pass optional `stageName`, `status` (e.g. `"completed"`), `notes`, and `links` at creation time to initialize a feature directly into an advanced or completed stage without a second request:
 

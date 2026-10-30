@@ -221,16 +221,84 @@ export async function ensureDatabaseReady(): Promise<void> {
       await seedInitialWorkspace(activeDb);
     }
 
-    // Auto-prune legacy demo seed data from existing databases
+    // Auto-prune legacy demo seed data and test users from existing databases
     await activeDb
       .delete(schema.projects)
       .where(eq(schema.projects.slug, "enterprise-cloud-v2"));
     await activeDb
       .delete(schema.apiKeys)
       .where(sql`key_prefix LIKE 'kz_live_demo%' OR id = 'key_default_agent'`);
+    await activeDb
+      .delete(schema.users)
+      .where(sql`email LIKE '%@example.com'`);
+
+    // Reconcile any legacy projects/API keys created under DEFAULT_USER_ID to the primary real OAuth user
+    const allUsers = await activeDb.select().from(schema.users);
+    const realUsers = allUsers.filter(
+      (u) => u.id !== DEFAULT_USER_ID && !isPlaceholderEmail(u.email)
+    );
+    const primaryOwner =
+      realUsers.find(
+        (u) =>
+          u.email.toLowerCase().includes("peter") ||
+          u.email.toLowerCase().includes("peetar") ||
+          u.name.toLowerCase().includes("peter") ||
+          u.name.toLowerCase().includes("peetar")
+      ) || (realUsers.length === 1 ? realUsers[0] : undefined);
+
+    if (primaryOwner) {
+      await reconcileLegacyDefaultUserAssets(activeDb, primaryOwner.id);
+    }
   })();
 
   return globalForDb.__keyzorInitPromise;
+}
+
+export function isPlaceholderEmail(email: string): boolean {
+  const normalized = email.trim().toLowerCase();
+  return (
+    normalized.endsWith("@kazor.app") ||
+    normalized.endsWith("@keyzor.vercel.app") ||
+    normalized.endsWith("@example.com")
+  );
+}
+
+export async function reconcileLegacyDefaultUserAssets(
+  activeDb: DrizzleInstance,
+  targetUserId: string
+): Promise<void> {
+  if (!targetUserId || targetUserId === DEFAULT_USER_ID) return;
+
+  await activeDb
+    .update(schema.projects)
+    .set({ ownerId: targetUserId })
+    .where(eq(schema.projects.ownerId, DEFAULT_USER_ID));
+
+  await activeDb
+    .update(schema.apiKeys)
+    .set({ userId: targetUserId })
+    .where(eq(schema.apiKeys.userId, DEFAULT_USER_ID));
+
+  await activeDb
+    .update(schema.projectInvites)
+    .set({ createdBy: targetUserId })
+    .where(eq(schema.projectInvites.createdBy, DEFAULT_USER_ID));
+
+  await activeDb
+    .update(schema.projectCollaborators)
+    .set({ invitedBy: targetUserId })
+    .where(eq(schema.projectCollaborators.invitedBy, DEFAULT_USER_ID));
+
+  await activeDb
+    .update(schema.projectAccessRequests)
+    .set({ reviewedBy: targetUserId })
+    .where(eq(schema.projectAccessRequests.reviewedBy, DEFAULT_USER_ID));
+
+  await activeDb.execute(sql`
+    DELETE FROM project_collaborators
+    WHERE user_id = ${targetUserId}
+      AND project_id IN (SELECT id FROM projects WHERE owner_id = ${targetUserId})
+  `);
 }
 
 async function seedInitialWorkspace(activeDb: DrizzleInstance) {
@@ -240,5 +308,4 @@ async function seedInitialWorkspace(activeDb: DrizzleInstance) {
     name: "Lead Architect (CPO / Dev)",
     provider: "credentials",
   });
-
 }

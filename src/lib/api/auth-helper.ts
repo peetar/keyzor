@@ -21,10 +21,13 @@ export async function resolveCaller(req: Request): Promise<ResolvedCaller | null
   if (authHeader) {
     const agentAuth = await authenticateAgentRequest(authHeader);
     if (agentAuth.valid && agentAuth.userId) {
+      const displayName = agentAuth.userName
+        ? `${agentAuth.userName} (${agentAuth.keyName})`
+        : agentAuth.keyName;
       return {
         userId: agentAuth.userId,
-        name: agentAuth.keyName,
-        email: "",
+        name: displayName,
+        email: agentAuth.userEmail || "",
         authType: "api_key",
       };
     }

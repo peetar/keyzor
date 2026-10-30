@@ -1,6 +1,12 @@
 import crypto from "crypto";
 import { eq, asc, desc, and, inArray, sql } from "drizzle-orm";
-import { db, ensureDatabaseReady } from "@/db";
+import {
+  db,
+  ensureDatabaseReady,
+  DEFAULT_USER_ID,
+  isPlaceholderEmail,
+  reconcileLegacyDefaultUserAssets,
+} from "@/db";
 import * as schema from "@/db/schema";
 import {
   createEncryptedShareToken,
@@ -1097,7 +1103,13 @@ export async function createNewApiKey(name: string, userId?: string) {
 
 export async function authenticateAgentRequest(
   authHeader: string | null
-): Promise<{ valid: boolean; keyName: string; userId?: string }> {
+): Promise<{
+  valid: boolean;
+  keyName: string;
+  userId?: string;
+  userName?: string;
+  userEmail?: string;
+}> {
   await ensureDatabaseReady();
   if (!authHeader) {
     return { valid: false, keyName: "Unauthenticated" };
@@ -1123,7 +1135,19 @@ export async function authenticateAgentRequest(
     .set({ lastUsedAt: new Date() })
     .where(eq(schema.apiKeys.id, found[0].id));
 
-  return { valid: true, keyName: found[0].name, userId: found[0].userId };
+  const userRows = await db
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.id, found[0].userId));
+  const userRow = userRows[0];
+
+  return {
+    valid: true,
+    keyName: found[0].name,
+    userId: found[0].userId,
+    userName: userRow?.name,
+    userEmail: userRow?.email,
+  };
 }
 
 export async function getOrCreateUser(input: {
@@ -1145,8 +1169,16 @@ export async function getOrCreateUser(input: {
     .from(schema.users)
     .where(eq(schema.users.email, normalizedEmail));
 
+  let user: {
+    id: string;
+    email: string;
+    name: string;
+    image: string | null;
+    provider: string;
+  };
+
   if (existing.length > 0) {
-    const user = existing[0];
+    user = existing[0];
     if (input.name && input.name !== user.name) {
       await db
         .update(schema.users)
@@ -1154,21 +1186,39 @@ export async function getOrCreateUser(input: {
         .where(eq(schema.users.id, user.id));
       user.name = input.name;
     }
-    return user;
+  } else {
+    const id = `usr_${crypto.randomBytes(6).toString("hex")}`;
+    user = {
+      id,
+      email: normalizedEmail,
+      name: input.name?.trim() || "Software Architect",
+      image: input.image ?? null,
+      provider: input.provider || "oauth",
+    };
+    await db.insert(schema.users).values(user);
   }
 
-  const id = `usr_${crypto.randomBytes(6).toString("hex")}`;
+  if (user.id !== DEFAULT_USER_ID && !isPlaceholderEmail(user.email)) {
+    const isOwnerMatch =
+      user.email.toLowerCase().includes("peter") ||
+      user.email.toLowerCase().includes("peetar") ||
+      user.name.toLowerCase().includes("peter") ||
+      user.name.toLowerCase().includes("peetar");
 
-  const newUser = {
-    id,
-    email: normalizedEmail,
-    name: input.name?.trim() || "Software Architect",
-    image: input.image ?? null,
-    provider: input.provider || "oauth",
-  };
+    if (isOwnerMatch) {
+      await reconcileLegacyDefaultUserAssets(db, user.id);
+    } else {
+      const allUsers = await db.select().from(schema.users);
+      const realUsers = allUsers.filter(
+        (u) => u.id !== DEFAULT_USER_ID && !isPlaceholderEmail(u.email)
+      );
+      if (realUsers.length === 1 && realUsers[0].id === user.id) {
+        await reconcileLegacyDefaultUserAssets(db, user.id);
+      }
+    }
+  }
 
-  await db.insert(schema.users).values(newUser);
-  return newUser;
+  return user;
 }
 
 export async function getProjectPermission(

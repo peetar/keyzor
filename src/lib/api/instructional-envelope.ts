@@ -244,9 +244,6 @@ export function generateKeyzorSkillMarkdown(
           .join("\n")
       : "- No projects created yet. Create one via `POST /api/v1/projects`.";
 
-  const sampleProjectSlug = projects[0]?.slug || "<projectSlug>";
-  const sampleFeatureSlug = projects[0]?.features[0]?.slug || "<featureSlug>";
-
   return `---
 name: keyzor-project-tracker
 description: Proactively track feature flowcharts, Gantt timelines, stage handoffs (design.md, PRs, prototypes, staging deploys), and the 4 Core Status Questions in KEYZOR. Activate whenever brainstorming new features, finishing architecture docs (design.md), handing work to dev teams, demoing prototypes, opening PRs, or deploying to test/prod.
@@ -306,17 +303,25 @@ Follow these 5 specific operational triggers:
 
 ---
 
-## 3. Authentication
+## 3. Authentication & Multi-Project Workspace Resolution
 
-Pass the KEYZOR API Key in the \`Authorization\` header on write calls (or all calls):
+Your KEYZOR API Key is **user-scoped**: it authenticates your user account and grants access to all projects where you are an Owner or Collaborator.
+
+Pass the KEYZOR API Key in the \`Authorization\` header on all requests:
 \`\`\`http
 Authorization: Bearer ${sampleApiKeyHint}
 Content-Type: application/json
 \`\`\`
 
+### Multi-Project Workspace Resolution (CRITICAL)
+Because a single user API key can access multiple projects across different codebases, you **MUST** ensure you are reading and updating the project that matches the user's current workspace:
+1. Inspect the current workspace directory name, \`package.json\` name, or \`git remote -v\` repository name.
+2. Query \`GET ${baseUrl}/api/v1/projects\` (or check Section 4 below) and match the current workspace/repository to the corresponding \`projectSlug\`.
+3. **Never blindly default to the first project in the list** if it does not match the current repository. If no existing project matches the current repository, or if there is any ambiguity, ask the user which KEYZOR project to target (or offer to create a new project via \`POST /api/v1/projects\`).
+
 ---
 
-## 4. Active Projects on This KEYZOR Instance
+## 4. Accessible Projects for This Account (Snapshot)
 ${projectListMd}
 
 ---
@@ -327,18 +332,24 @@ Every endpoint returns an \`agent_guidance\` envelope telling you the current st
 
 > **Tip for AI Agents:** You can use either the full ID (\`feat_e70bc59839\`) or the URL slug (\`decouple-screening-from-registration-triage\`) interchangeably in all \`/api/v1/features/:idOrSlug\` routes. Both \`PATCH /api/v1/features/:idOrSlug\` and \`PATCH /api/v1/features/:idOrSlug/status\` are supported.
 
-### A. List All Projects & Feature Summaries
+### A. List All Accessible Projects & Feature Summaries
 \`\`\`bash
 curl -s "${baseUrl}/api/v1/projects" \\
   -H "Authorization: Bearer ${sampleApiKeyHint}"
 \`\`\`
 
-### B. Create a New Feature Flowchart (or Batch-Create Multiple Features)
+### B. Inspect a Specific Project's Features & Stages
+\`\`\`bash
+curl -s "${baseUrl}/api/v1/projects/<projectSlug>" \\
+  -H "Authorization: Bearer ${sampleApiKeyHint}"
+\`\`\`
+
+### C. Create a New Feature Flowchart (or Batch-Create Multiple Features)
 You can omit \`customStages\` to use the project's default 7-stage Architect Lifecycle (\`Brainstorming & Scope\` → \`Architecture & design.md\` → \`Handed Over to Dev\` → \`Prototype Demo\` → \`Deployed on Dev/Test\` → \`Bugfixes & Feedback\` → \`Live in Production\`), OR pass \`customStages\` tailored to the feature!
 You can also pass optional \`stageName\`, \`status\` (e.g. \`"completed"\`), \`notes\`, and \`links\` at creation time to initialize a feature directly into an advanced or completed stage without a second request:
 
 \`\`\`bash
-curl -X POST "${baseUrl}/api/v1/projects/${sampleProjectSlug}/features" \\
+curl -X POST "${baseUrl}/api/v1/projects/<projectSlug>/features" \\
   -H "Authorization: Bearer ${sampleApiKeyHint}" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -364,7 +375,7 @@ curl -X POST "${baseUrl}/api/v1/projects/${sampleProjectSlug}/features" \\
 #### Batch Feature Ingestion (\`POST /api/v1/projects/<projectSlug>/features/batch\`)
 To seed a roadmap or create multiple features in a single HTTP request:
 \`\`\`bash
-curl -X POST "${baseUrl}/api/v1/projects/${sampleProjectSlug}/features/batch" \\
+curl -X POST "${baseUrl}/api/v1/projects/<projectSlug>/features/batch" \\
   -H "Authorization: Bearer ${sampleApiKeyHint}" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -389,14 +400,14 @@ curl -X POST "${baseUrl}/api/v1/projects/${sampleProjectSlug}/features/batch" \\
   }'
 \`\`\`
 
-### C. Advance Stage, Update the 4 Questions, or Attach Links (design.md, GitHub PR, Trello, Preview URL)
+### D. Advance Stage, Update the 4 Questions, or Attach Links (design.md, GitHub PR, Trello, Preview URL)
 Use \`PATCH /api/v1/features/<featureIdOrSlug>/status\` (or alias \`PATCH /api/v1/features/<featureIdOrSlug>\`) for all updates:
 - Set \`"action": "advance"\` to move to the next stage in the flowchart.
 - Or set \`"stageName": "Handed Over to Dev"\` to jump to a specific stage by name.
 - Or omit \`"action"\`/\`"stageName"\` to simply update \`currentOwner\`, \`targetDate\`, \`expectedDate\`, \`notes\`, or attach \`links\`.
 
 \`\`\`bash
-curl -X PATCH "${baseUrl}/api/v1/features/${sampleFeatureSlug}/status" \\
+curl -X PATCH "${baseUrl}/api/v1/features/<featureSlug>/status" \\
   -H "Authorization: Bearer ${sampleApiKeyHint}" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -419,7 +430,7 @@ curl -X PATCH "${baseUrl}/api/v1/features/${sampleFeatureSlug}/status" \\
 To advance a feature to the final stage and mark it 100% complete:
 
 \`\`\`bash
-curl -X PATCH "${baseUrl}/api/v1/features/${sampleFeatureSlug}/status" \\
+curl -X PATCH "${baseUrl}/api/v1/features/<featureSlug>/status" \\
   -H "Authorization: Bearer ${sampleApiKeyHint}" \\
   -H "Content-Type: application/json" \\
   -d '{
