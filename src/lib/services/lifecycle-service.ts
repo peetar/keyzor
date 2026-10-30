@@ -661,7 +661,11 @@ export interface CreateFeatureInput {
   targetDate?: string;
   expectedDate?: string;
   priority?: string;
+  stageName?: string;
+  initialStage?: string;
   initialStageName?: string;
+  status?: string;
+  notes?: string;
   customStages?: Array<{
     name: string;
     owner?: string;
@@ -718,19 +722,32 @@ export async function createFeatureWithFlow(
   const today = todayIsoDate();
   const stageRows: Array<typeof schema.featureStages.$inferInsert> = [];
 
-  let activeIndex = 0;
-  if (input.initialStageName) {
-    const foundIdx = stageTemplates.findIndex(
-      (s) => s.name.toLowerCase() === input.initialStageName!.toLowerCase()
+  const requestedStageName =
+    input.stageName || input.initialStage || input.initialStageName;
+  const isFeatureCompleted = input.status === "completed";
+
+  let activeIndex = isFeatureCompleted
+    ? Math.max(0, stageTemplates.length - 1)
+    : 0;
+  if (requestedStageName) {
+    const exactIdx = stageTemplates.findIndex(
+      (s) => s.name.toLowerCase() === requestedStageName.toLowerCase()
     );
-    if (foundIdx >= 0) activeIndex = foundIdx;
+    const partialIdx =
+      exactIdx >= 0
+        ? exactIdx
+        : stageTemplates.findIndex((s) =>
+            s.name.toLowerCase().includes(requestedStageName.toLowerCase())
+          );
+    if (partialIdx >= 0) activeIndex = partialIdx;
   }
 
   for (let i = 0; i < stageTemplates.length; i++) {
     const st = stageTemplates[i];
     const stageId = `stg_${crypto.randomBytes(5).toString("hex")}`;
-    const isCompleted = i < activeIndex;
     const isCurrent = i === activeIndex;
+    const isCompleted =
+      i < activeIndex || (isCurrent && isFeatureCompleted);
 
     const plannedStart = st.plannedStartDate || addDaysIso(today, i * 3);
     const plannedEnd = st.plannedEndDate || addDaysIso(today, (i + 1) * 3);
@@ -751,7 +768,7 @@ export async function createFeatureWithFlow(
       actualEndDate: isCompleted ? today : null,
       agentInstructions: st.agentInstructions,
       proactiveTrigger: st.proactiveTrigger,
-      notes: isCurrent ? "Initialized stage." : "",
+      notes: isCurrent ? input.notes || "Initialized stage." : "",
     });
   }
 
@@ -773,7 +790,7 @@ export async function createFeatureWithFlow(
       "Lead Architect",
     targetDate: defaultTargetDate,
     expectedDate: defaultExpectedDate,
-    status: "active",
+    status: isFeatureCompleted ? "completed" : input.status || "active",
     priority: input.priority || "high",
   });
 
@@ -802,7 +819,11 @@ export async function createFeatureWithFlow(
     actorType: input.actorType ?? "agent",
     actorName: input.actorName ?? "Coding Agent",
     action: "Created Feature Flowchart",
-    details: `Created '${input.title}' at stage '${stageRows[activeIndex]?.name}' (Owner: ${input.currentOwner || "Architect"}, Target: ${defaultTargetDate}).`,
+    details: `Created '${input.title}' at stage '${stageRows[activeIndex]?.name}' (Status: ${
+      isFeatureCompleted ? "completed" : input.status || "active"
+    }, Owner: ${input.currentOwner || "Architect"}, Target: ${defaultTargetDate})${
+      input.notes ? ` — Note: "${input.notes}"` : ""
+    }.`,
   });
 
   const enriched = await getFeatureByIdOrSlug(featureId);
@@ -896,9 +917,14 @@ export async function updateFeatureStatus(
       targetStage = matched;
       actionSummaryParts.push(`Moved to stage '${targetStage.name}'`);
     }
+  } else if (input.action === "complete_feature" && stages.length > 0) {
+    targetStage = stages[stages.length - 1];
+    actionSummaryParts.push(`Completed feature at '${targetStage.name}'`);
   }
 
   const newStageIdx = stages.findIndex((s) => s.id === targetStage?.id);
+  const isMarkingCompleted =
+    input.action === "complete_feature" || input.status === "completed";
 
   // If transitioning stage or completing feature, update stage statuses & actual dates for Gantt
   if (
@@ -906,11 +932,11 @@ export async function updateFeatureStatus(
     input.action === "set_stage" ||
     input.stageId ||
     input.stageName ||
-    input.action === "complete_feature"
+    isMarkingCompleted
   ) {
     for (let i = 0; i < stages.length; i++) {
       const s = stages[i];
-      if (input.action === "complete_feature" || i < newStageIdx) {
+      if (i < newStageIdx || (input.action === "complete_feature" && i < stages.length - 1)) {
         await db
           .update(schema.featureStages)
           .set({
@@ -924,10 +950,12 @@ export async function updateFeatureStatus(
         await db
           .update(schema.featureStages)
           .set({
-            status: "in_progress",
+            status: isMarkingCompleted ? "completed" : "in_progress",
             owner: input.currentOwner || s.owner || feature.currentOwner,
             actualStartDate: input.actualStartDate || s.actualStartDate || today,
-            actualEndDate: input.actualEndDate ?? null,
+            actualEndDate: isMarkingCompleted
+              ? input.actualEndDate || s.actualEndDate || today
+              : input.actualEndDate ?? null,
             plannedStartDate: input.plannedStartDate ?? s.plannedStartDate,
             plannedEndDate: input.plannedEndDate ?? s.plannedEndDate,
             notes: input.notes !== undefined ? input.notes : s.notes,
@@ -966,7 +994,7 @@ export async function updateFeatureStatus(
   const updatedExpectedDate =
     input.expectedDate !== undefined ? input.expectedDate : feature.expectedDate;
   const isFinalStage =
-    input.action === "complete_feature" ||
+    isMarkingCompleted ||
     (newStageIdx === stages.length - 1 &&
       targetStage?.name.toLowerCase().includes("production") &&
       input.status === "completed");
@@ -979,6 +1007,9 @@ export async function updateFeatureStatus(
   }
   if (input.expectedDate && input.expectedDate !== feature.expectedDate) {
     actionSummaryParts.push(`Expected Date → ${input.expectedDate}`);
+  }
+  if (isFinalStage && feature.status !== "completed") {
+    actionSummaryParts.push(`Status → completed (100%)`);
   }
 
   await db

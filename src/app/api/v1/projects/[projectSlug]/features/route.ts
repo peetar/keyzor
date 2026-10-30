@@ -122,6 +122,86 @@ export async function POST(
 
     const body = await req.json();
 
+    // If caller passed a batch array to /features directly, handle batch creation gracefully
+    if (Array.isArray(body.features)) {
+      if (body.features.length === 0) {
+        return NextResponse.json(
+          { ok: false, error: "Field 'features' must be a non-empty array." },
+          { status: 400 }
+        );
+      }
+
+      const baseUrl = getBaseUrl(req);
+      const createdFeatures = [];
+      for (const item of body.features) {
+        if (!item.title || typeof item.title !== "string") {
+          return NextResponse.json(
+            { ok: false, error: "Each item in 'features' must include a string 'title'." },
+            { status: 400 }
+          );
+        }
+        const created = await createFeatureWithFlow({
+          projectIdOrSlug: projectSlug,
+          title: item.title,
+          slug: item.slug,
+          summary: item.summary,
+          currentOwner: item.currentOwner || item.owner || item.who,
+          targetDate: item.targetDate || item.whenWantDone,
+          expectedDate: item.expectedDate || item.whenExpectDone,
+          priority: item.priority,
+          stageName: item.stageName || item.stage,
+          initialStage: item.initialStage,
+          initialStageName: item.initialStageName,
+          status: item.status,
+          notes: item.notes,
+          customStages: item.customStages,
+          links: item.links,
+          actorName:
+            item.actorName ||
+            body.actorName ||
+            caller.name ||
+            (caller.authType === "api_key" ? "Agent" : "Architect"),
+          actorType:
+            item.actorType ||
+            body.actorType ||
+            (caller.authType === "api_key" ? "agent" : "human"),
+        });
+        createdFeatures.push({
+          ...created,
+          agent_guidance: buildFeatureGuidance(
+            created,
+            baseUrl,
+            `Created feature flowchart '${created.title}' at stage '${created.fourQuestions.where.stageName}' (${created.fourQuestions.where.percentComplete}% complete).`
+          ),
+        });
+      }
+
+      return respondInstructional(
+        req,
+        { features: createdFeatures },
+        {
+          protocol: "KEYZOR-Instructional-API/1.0",
+          headline: `Batch created ${createdFeatures.length} feature flowchart(s) in project '${projectSlug}'.`,
+          proactive_milestone_prompt_rule:
+            "Whenever a milestone, design handoff, or deployment is reached for any of these features, proactively ask: 'Would you like me to update the KEYZOR flowchart?'",
+          next_recommended_api_calls: [
+            {
+              when_to_call: "To advance or update any created feature",
+              method: "PATCH",
+              endpoint: `${baseUrl}/api/v1/features/${createdFeatures[0]?.slug || "feature-slug"}/status`,
+              example_body: {
+                action: "advance",
+                currentOwner: "Dev Team",
+                notes: "Completed milestone deliverables.",
+              },
+            },
+          ],
+        },
+        undefined,
+        201
+      );
+    }
+
     if (!body.title || typeof body.title !== "string") {
       return NextResponse.json(
         {
@@ -138,11 +218,15 @@ export async function POST(
       title: body.title,
       slug: body.slug,
       summary: body.summary,
-      currentOwner: body.currentOwner,
-      targetDate: body.targetDate,
-      expectedDate: body.expectedDate,
+      currentOwner: body.currentOwner || body.owner || body.who,
+      targetDate: body.targetDate || body.whenWantDone,
+      expectedDate: body.expectedDate || body.whenExpectDone,
       priority: body.priority,
+      stageName: body.stageName || body.stage,
+      initialStage: body.initialStage,
       initialStageName: body.initialStageName,
+      status: body.status,
+      notes: body.notes,
       customStages: body.customStages,
       links: body.links,
       actorName: body.actorName || caller.name || (caller.authType === "api_key" ? "Agent" : "Architect"),
@@ -153,7 +237,7 @@ export async function POST(
     const guidance = buildFeatureGuidance(
       feature,
       baseUrl,
-      `Created feature flowchart '${feature.title}' (${feature.stages.length} stages).`
+      `Created feature flowchart '${feature.title}' at stage '${feature.fourQuestions.where.stageName}' (${feature.fourQuestions.where.percentComplete}% complete).`
     );
     const md = formatFeatureMarkdownForAgent(feature, guidance);
 

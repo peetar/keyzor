@@ -106,6 +106,32 @@ export function buildFeatureGuidance(
           actorName: "Coding Agent",
         },
       },
+      ...(feature.status !== "completed"
+        ? [
+            {
+              when_to_call:
+                "When completing this feature (100% shipped to production)",
+              method: "PATCH",
+              endpoint: `${baseUrl}/api/v1/features/${feature.slug}/status`,
+              example_body: {
+                stageName:
+                  feature.stages[feature.stages.length - 1]?.name ||
+                  "Live in Production",
+                status: "completed",
+                currentOwner: "Released",
+                notes: "Feature verified, merged, and live in production.",
+                links: [
+                  {
+                    label: "Release / PR Link",
+                    url: "https://github.com/org/repo/pull/123",
+                    linkType: "pr",
+                  },
+                ],
+                actorName: "Coding Agent",
+              },
+            },
+          ]
+        : []),
     ],
   };
 }
@@ -299,14 +325,17 @@ ${projectListMd}
 
 Every endpoint returns an \`agent_guidance\` envelope telling you the current state of the 4 Core Questions, expectations for the active stage, and the exact payload for your next transition.
 
+> **Tip for AI Agents:** You can use either the full ID (\`feat_e70bc59839\`) or the URL slug (\`decouple-screening-from-registration-triage\`) interchangeably in all \`/api/v1/features/:idOrSlug\` routes. Both \`PATCH /api/v1/features/:idOrSlug\` and \`PATCH /api/v1/features/:idOrSlug/status\` are supported.
+
 ### A. List All Projects & Feature Summaries
 \`\`\`bash
 curl -s "${baseUrl}/api/v1/projects" \\
   -H "Authorization: Bearer ${sampleApiKeyHint}"
 \`\`\`
 
-### B. Create a New Feature Flowchart (During Brainstorming or Mini-Project/Bugfix)
+### B. Create a New Feature Flowchart (or Batch-Create Multiple Features)
 You can omit \`customStages\` to use the project's default 7-stage Architect Lifecycle (\`Brainstorming & Scope\` → \`Architecture & design.md\` → \`Handed Over to Dev\` → \`Prototype Demo\` → \`Deployed on Dev/Test\` → \`Bugfixes & Feedback\` → \`Live in Production\`), OR pass \`customStages\` tailored to the feature!
+You can also pass optional \`stageName\`, \`status\` (e.g. \`"completed"\`), \`notes\`, and \`links\` at creation time to initialize a feature directly into an advanced or completed stage without a second request:
 
 \`\`\`bash
 curl -X POST "${baseUrl}/api/v1/projects/${sampleProjectSlug}/features" \\
@@ -319,15 +348,52 @@ curl -X POST "${baseUrl}/api/v1/projects/${sampleProjectSlug}/features" \\
     "targetDate": "2026-11-15",
     "expectedDate": "2026-11-14",
     "priority": "high",
+    "stageName": "Architecture & design.md",
+    "notes": "Initial scope and architecture spec drafted.",
+    "links": [
+      {
+        "label": "Implementation Spec",
+        "url": "https://github.com/org/repo/blob/main/spec.md",
+        "linkType": "design_doc"
+      }
+    ],
+    "actorName": "Coding Agent"
+  }'
+\`\`\`
+
+#### Batch Feature Ingestion (\`POST /api/v1/projects/<projectSlug>/features/batch\`)
+To seed a roadmap or create multiple features in a single HTTP request:
+\`\`\`bash
+curl -X POST "${baseUrl}/api/v1/projects/${sampleProjectSlug}/features/batch" \\
+  -H "Authorization: Bearer ${sampleApiKeyHint}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "features": [
+      {
+        "title": "Inpatient Module",
+        "summary": "Ward bed management and clinical rounding.",
+        "stageName": "Bugfixes & Feedback",
+        "currentOwner": "QA Team",
+        "targetDate": "2026-11-15"
+      },
+      {
+        "title": "Cashier Partial Payments",
+        "summary": "Accept fractional payments with dynamic ledger balance tracking.",
+        "stageName": "Live in Production",
+        "status": "completed",
+        "currentOwner": "Released",
+        "targetDate": "2026-10-27"
+      }
+    ],
     "actorName": "Coding Agent"
   }'
 \`\`\`
 
 ### C. Advance Stage, Update the 4 Questions, or Attach Links (design.md, GitHub PR, Trello, Preview URL)
-Use \`PATCH /api/v1/features/<featureIdOrSlug>/status\` for all updates:
+Use \`PATCH /api/v1/features/<featureIdOrSlug>/status\` (or alias \`PATCH /api/v1/features/<featureIdOrSlug>\`) for all updates:
 - Set \`"action": "advance"\` to move to the next stage in the flowchart.
 - Or set \`"stageName": "Handed Over to Dev"\` to jump to a specific stage by name.
-- Or omit \`action\`/\`stageName\` to simply update \`currentOwner\`, \`targetDate\`, \`expectedDate\`, \`notes\`, or attach \`links\`.
+- Or omit \`"action"\`/\`"stageName"\` to simply update \`currentOwner\`, \`targetDate\`, \`expectedDate\`, \`notes\`, or attach \`links\`.
 
 \`\`\`bash
 curl -X PATCH "${baseUrl}/api/v1/features/${sampleFeatureSlug}/status" \\
@@ -347,6 +413,60 @@ curl -X PATCH "${baseUrl}/api/v1/features/${sampleFeatureSlug}/status" \\
     ],
     "actorName": "Coding Agent"
   }'
+\`\`\`
+
+### Completing a Feature (100% Shipped)
+To advance a feature to the final stage and mark it 100% complete:
+
+\`\`\`bash
+curl -X PATCH "${baseUrl}/api/v1/features/${sampleFeatureSlug}/status" \\
+  -H "Authorization: Bearer ${sampleApiKeyHint}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "stageName": "Live in Production",
+    "status": "completed",
+    "currentOwner": "Released",
+    "notes": "Feature verified, merged, and live in production.",
+    "links": [
+      {
+        "label": "Release / PR Link",
+        "url": "https://github.com/org/repo/pull/123",
+        "linkType": "pr"
+      }
+    ],
+    "actorName": "Coding Agent"
+  }'
+\`\`\`
+
+### D. Zero-Dependency Node.js Helper (PowerShell & Windows Safe)
+Inline \`curl\` with complex JSON payloads can encounter quoting issues in PowerShell and Windows shells. Use this cross-platform Node.js snippet for reliable execution:
+
+\`\`\`javascript
+// Quick Keyzor API Helper (zero dependencies)
+const https = require('https');
+
+function keyzorRequest(method, path, body, apiKey) {
+  return new Promise((resolve, reject) => {
+    const payload = body ? JSON.stringify(body) : '';
+    const req = https.request({
+      hostname: 'keyzor.vercel.app',
+      path,
+      method,
+      headers: {
+        'Authorization': \`Bearer \${apiKey}\`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload)
+      }
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => resolve(JSON.parse(data)));
+    });
+    req.on('error', reject);
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
 \`\`\`
 `;
 }

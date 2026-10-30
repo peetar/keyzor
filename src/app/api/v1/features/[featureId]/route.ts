@@ -9,6 +9,10 @@ import {
   respondInstructional,
 } from "@/lib/api/instructional-envelope";
 import { resolveCaller } from "@/lib/api/auth-helper";
+import {
+  PATCH as patchFeatureStatus,
+  POST as postFeatureStatus,
+} from "./status/route";
 
 function getBaseUrl(req: Request): string {
   const url = new URL(req.url);
@@ -57,3 +61,18 @@ export async function GET(
 
   return respondInstructional(req, { feature }, guidance, md);
 }
+
+export async function PATCH(
+  req: Request,
+  context: { params: Promise<{ featureId: string }> }
+) {
+  return patchFeatureStatus(req, context);
+}
+
+export async function POST(
+  req: Request,
+  context: { params: Promise<{ featureId: string }> }
+) {
+  return postFeatureStatus(req, context);
+}
+
