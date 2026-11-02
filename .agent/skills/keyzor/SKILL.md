@@ -7,11 +7,14 @@ description: Proactively track feature flowcharts, Gantt timelines, stage handof
 
 Welcome, Coding Agent! You have connected to **KEYZOR** (`https://keyzor.vercel.app`), an AI-native project & feature flowchart tracker built for software architects and agentic developers.
 
-## 1. How to Install This Skill Locally
-Save this response (or the section between the `---` frontmatter and the end of this file) as a skill in your environment:
-- **Antigravity / Gemini**: `.agent/skills/keyzor/SKILL.md`
-- **Claude Code**: `.claude/skills/keyzor/SKILL.md`
-- **Cursor**: `.cursor/rules/keyzor.mdc`
+## 1. How to Install This Skill Locally (GitGuardian / Secret-Safe)
+1. **Store Your API Key in `.env.local` (NEVER inside `SKILL.md` or tracked files)**:
+   - Add `KEYZOR_API_KEY=<YOUR_KEYZOR_API_KEY>` to your local `.env.local` file and ensure `.env.local` is listed in `.gitignore`.
+   - **Never** hardcode a live `kz_live_...` bearer token inside `SKILL.md` or commit it to git.
+2. **Save This Skill File**:
+   - **Antigravity / Gemini**: `.agent/skills/keyzor/SKILL.md`
+   - **Claude Code**: `.claude/skills/keyzor/SKILL.md`
+   - **Cursor**: `.cursor/rules/keyzor.mdc`
 
 ---
 
@@ -61,9 +64,9 @@ Follow these 5 specific operational triggers:
 
 Your KEYZOR API Key is **user-scoped**: it authenticates your user account and grants access to all projects where you are an Owner or Collaborator.
 
-Pass your registered KEYZOR API Key in the `Authorization` header on all requests:
+Read `KEYZOR_API_KEY` from your gitignored `.env.local` file and pass it in the `Authorization` header on all requests:
 ```http
-Authorization: Bearer kz_live_eXKAXwwzMBuUyOhFgneldyw3
+Authorization: Bearer $KEYZOR_API_KEY
 Content-Type: application/json
 ```
 
@@ -84,13 +87,13 @@ Every endpoint returns an `agent_guidance` envelope telling you the current stat
 ### A. List All Accessible Projects & Feature Summaries
 ```bash
 curl -s "https://keyzor.vercel.app/api/v1/projects" \
-  -H "Authorization: Bearer kz_live_eXKAXwwzMBuUyOhFgneldyw3"
+  -H "Authorization: Bearer $KEYZOR_API_KEY"
 ```
 
 ### B. Inspect a Specific Project's Features & Stages
 ```bash
 curl -s "https://keyzor.vercel.app/api/v1/projects/<projectSlug>" \
-  -H "Authorization: Bearer kz_live_eXKAXwwzMBuUyOhFgneldyw3"
+  -H "Authorization: Bearer $KEYZOR_API_KEY"
 ```
 
 ### C. Create a New Feature Flowchart (or Batch-Create Multiple Features)
@@ -99,7 +102,7 @@ You can also pass optional `stageName`, `status` (e.g. `"completed"`), `notes`, 
 
 ```bash
 curl -X POST "https://keyzor.vercel.app/api/v1/projects/<projectSlug>/features" \
-  -H "Authorization: Bearer kz_live_eXKAXwwzMBuUyOhFgneldyw3" \
+  -H "Authorization: Bearer $KEYZOR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Customer Usage Export API",
@@ -125,7 +128,7 @@ curl -X POST "https://keyzor.vercel.app/api/v1/projects/<projectSlug>/features" 
 To seed a roadmap or create multiple features in a single HTTP request:
 ```bash
 curl -X POST "https://keyzor.vercel.app/api/v1/projects/<projectSlug>/features/batch" \
-  -H "Authorization: Bearer kz_live_eXKAXwwzMBuUyOhFgneldyw3" \
+  -H "Authorization: Bearer $KEYZOR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "features": [
@@ -149,15 +152,15 @@ curl -X POST "https://keyzor.vercel.app/api/v1/projects/<projectSlug>/features/b
   }'
 ```
 
-### C. Advance Stage, Update the 4 Questions, or Attach Links (design.md, GitHub PR, Trello, Preview URL)
+### D. Advance Stage, Update the 4 Questions, or Attach Links (design.md, GitHub PR, Trello, Preview URL)
 Use `PATCH /api/v1/features/<featureIdOrSlug>/status` (or alias `PATCH /api/v1/features/<featureIdOrSlug>`) for all updates:
 - Set `"action": "advance"` to move to the next stage in the flowchart.
-- Or set `"stageName": "Handed Over to Dev"` to jump to a specific stage by name.
+- Or set `"stageName": "Handed Over to Dev"\` to jump to a specific stage by name.
 - Or omit `"action"`/`"stageName"` to simply update `currentOwner`, `targetDate`, `expectedDate`, `notes`, or attach `links`.
 
 ```bash
 curl -X PATCH "https://keyzor.vercel.app/api/v1/features/<featureSlug>/status" \
-  -H "Authorization: Bearer kz_live_eXKAXwwzMBuUyOhFgneldyw3" \
+  -H "Authorization: Bearer $KEYZOR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "action": "advance",
@@ -180,7 +183,7 @@ To advance a feature to the final stage and mark it 100% complete:
 
 ```bash
 curl -X PATCH "https://keyzor.vercel.app/api/v1/features/<featureSlug>/status" \
-  -H "Authorization: Bearer kz_live_eXKAXwwzMBuUyOhFgneldyw3" \
+  -H "Authorization: Bearer $KEYZOR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "stageName": "Live in Production",
@@ -198,14 +201,26 @@ curl -X PATCH "https://keyzor.vercel.app/api/v1/features/<featureSlug>/status" \
   }'
 ```
 
-### D. Zero-Dependency Node.js Helper (PowerShell & Windows Safe)
-Inline `curl` with complex JSON payloads often encounters quoting and escaping issues in PowerShell and Windows shells. Use this cross-platform Node.js snippet for flawless execution:
+### E. Zero-Dependency Node.js Helper (PowerShell & Windows Safe, Reads `.env.local`)
+Inline `curl` with complex JSON payloads often encounters quoting and escaping issues in PowerShell and Windows shells. Use this cross-platform Node.js snippet, which automatically loads `KEYZOR_API_KEY` from `.env.local`:
 
 ```javascript
-// Quick Keyzor API Helper (zero dependencies)
+// Quick Keyzor API Helper (zero dependencies, reads KEYZOR_API_KEY from .env.local)
 const https = require('https');
+const fs = require('fs');
 
-function keyzorRequest(method, path, body, apiKey) {
+function getKeyzorApiKey() {
+  if (process.env.KEYZOR_API_KEY) return process.env.KEYZOR_API_KEY.trim();
+  for (const file of ['.env.local', '.env']) {
+    if (fs.existsSync(file)) {
+      const match = fs.readFileSync(file, 'utf8').match(/^KEYZOR_API_KEY=(.+)$/m);
+      if (match) return match[1].trim().replace(/^["']|["']$/g, '');
+    }
+  }
+  throw new Error('KEYZOR_API_KEY not found in environment or .env.local');
+}
+
+function keyzorRequest(method, path, body, apiKey = getKeyzorApiKey()) {
   return new Promise((resolve, reject) => {
     const payload = body ? JSON.stringify(body) : '';
     const req = https.request({

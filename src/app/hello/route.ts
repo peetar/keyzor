@@ -177,7 +177,7 @@ export async function GET(req: Request) {
         welcome:
           "Welcome to KEYZOR! This endpoint provides everything an AI coding agent needs to build a local KEYZOR skill and track feature flowcharts.",
         recommended_action_for_agent:
-          "Save the `skill_markdown` field below to `.agent/skills/keyzor/SKILL.md` (or `.claude/skills/keyzor/SKILL.md`), then query `GET /api/v1/projects`.",
+          "Store `KEYZOR_API_KEY` in `.env.local` (never inside tracked files), save the `skill_markdown` field below to `.agent/skills/keyzor/SKILL.md` (or `.claude/skills/keyzor/SKILL.md`), then query `GET /api/v1/projects`.",
         four_core_questions: [
           "1. Where is this feature? (currentStageId / stageName)",
           "2. Who is working on it? (currentOwner)",
@@ -249,7 +249,7 @@ export async function GET(req: Request) {
         Paste this instruction into Antigravity, Claude Code, Cursor, or Windsurf:
       </p>
       <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center bg-slate-50 border border-slate-200 rounded-xl p-3">
-        <code id="agent-prompt" class="text-xs text-emerald-800 font-mono flex-1 break-all">Fetch ${baseUrl}/hello?format=skill&key=${apiKey} and save the returned instructions as your KEYZOR skill (SKILL.md). Then show me the current status of our projects.</code>
+        <code id="agent-prompt" class="text-xs text-emerald-800 font-mono flex-1 break-all">Save KEYZOR_API_KEY=${apiKey} in .env.local (never write raw API keys into tracked files), then fetch ${baseUrl}/hello?format=skill&key=${apiKey} and save the returned instructions as your KEYZOR skill (SKILL.md). Then show me the current status of our projects.</code>
         <button onclick="navigator.clipboard.writeText(document.getElementById('agent-prompt').innerText); this.innerText='Copied!'; setTimeout(()=>this.innerText='Copy Agent Prompt', 2000);" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs whitespace-nowrap shadow-xs transition">
           Copy Agent Prompt
         </button>

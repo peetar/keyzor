@@ -227,7 +227,9 @@ export async function ensureDatabaseReady(): Promise<void> {
       .where(eq(schema.projects.slug, "enterprise-cloud-v2"));
     await activeDb
       .delete(schema.apiKeys)
-      .where(sql`key_prefix LIKE 'kz_live_demo%' OR id = 'key_default_agent'`);
+      .where(
+        sql`key_prefix LIKE 'kz_live_demo%' OR key_prefix LIKE 'kz_live_eXKA%' OR id = 'key_default_agent'`
+      );
     await activeDb
       .delete(schema.users)
       .where(sql`email LIKE '%@example.com'`);

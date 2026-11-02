@@ -1099,6 +1099,19 @@ export async function createNewApiKey(name: string, userId?: string) {
   return { id, name, rawKey, keyPrefix };
 }
 
+export async function revokeApiKey(keyId: string, userId: string) {
+  await ensureDatabaseReady();
+  if (!keyId || !userId) {
+    throw new Error("Both 'keyId' and 'userId' are required to revoke an API key.");
+  }
+
+  await db
+    .delete(schema.apiKeys)
+    .where(and(eq(schema.apiKeys.id, keyId), eq(schema.apiKeys.userId, userId)));
+
+  return { revoked: true, id: keyId };
+}
+
 export async function authenticateAgentRequest(
   authHeader: string | null
 ): Promise<{
@@ -1114,8 +1127,12 @@ export async function authenticateAgentRequest(
   }
 
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-  if (!token) {
-    return { valid: false, keyName: "Unauthenticated" };
+  if (
+    !token ||
+    token.startsWith("kz_live_eXKA") ||
+    token.startsWith("kz_live_demo")
+  ) {
+    return { valid: false, keyName: "Revoked or Unauthenticated Key" };
   }
 
   const hashed = hashApiKey(token);

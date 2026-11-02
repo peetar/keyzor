@@ -508,7 +508,7 @@ export function KeyzorDashboard({
     ? `${origin}/join?code=${currentProject.inviteCode}`
     : `${origin}/join`;
 
-  const agentOnboardingPrompt = `Fetch ${origin}/hello?format=skill&key=${activeApiKey} and save the returned instructions as your KEYZOR skill (SKILL.md). Whenever we brainstorm a new feature, finish a design.md, demo a prototype, or open a PR, ask me: "Would you like to update the KEYZOR flowchart?"`;
+  const agentOnboardingPrompt = `Save KEYZOR_API_KEY=${activeApiKey} in .env.local (ensure .env.local is gitignored and never write raw API keys into tracked files), then fetch ${origin}/hello?format=skill&key=${activeApiKey} and save the returned instructions as your KEYZOR skill (SKILL.md). Whenever we brainstorm a new feature, finish a design.md, demo a prototype, or open a PR, ask me: "Would you like to update the KEYZOR flowchart?"`;
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
