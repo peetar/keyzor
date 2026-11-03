@@ -202,12 +202,13 @@ export const projectInvites = pgTable("project_invites", {
   projectId: text("project_id")
     .notNull()
     .references(() => projects.id, { onDelete: "cascade" }),
-  code: text("code").notNull().unique(), // e.g. "KZ-7X9B2"
+  code: text("code").notNull().unique(), // e.g. "KZ-9X7M2-Q4W8P"
   createdBy: text("created_by")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   isActive: boolean("is_active").notNull().default(true),
   usesCount: integer("uses_count").notNull().default(0),
+  expiresAt: timestamp("expires_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

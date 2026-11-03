@@ -40,10 +40,13 @@ import {
   UserCheck,
   UserX,
   Lock,
+  Clock,
+  Ban,
 } from "lucide-react";
 
 interface KeyzorDashboardProps {
   initialProjects: EnrichedProject[];
+  initialSelectedProjectId?: string;
   defaultApiKey: string;
   userEmail: string;
   userName: string;
@@ -52,6 +55,7 @@ interface KeyzorDashboardProps {
 
 export function KeyzorDashboard({
   initialProjects,
+  initialSelectedProjectId,
   defaultApiKey,
   userEmail,
   userName,
@@ -59,7 +63,9 @@ export function KeyzorDashboard({
 }: KeyzorDashboardProps) {
   const [projects, setProjects] = useState<EnrichedProject[]>(initialProjects);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
-    initialProjects[0]?.id || ""
+    initialSelectedProjectId && initialProjects.some((p) => p.id === initialSelectedProjectId)
+      ? initialSelectedProjectId
+      : initialProjects[0]?.id || ""
   );
   const [viewMode, setViewMode] = useState<"gantt" | "flowchart" | "both">(
     "both"
@@ -409,6 +415,26 @@ export function KeyzorDashboard({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ rotate: true }),
+        }
+      );
+      if (res.ok) {
+        await refreshProjects(currentProject.id);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeactivateInviteCode = async (inviteId?: string) => {
+    if (!currentProject) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch(
+        `/api/v1/projects/${currentProject.slug}/invites`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: inviteId }),
         }
       );
       if (res.ok) {
@@ -1472,77 +1498,187 @@ export function KeyzorDashboard({
                   Invite other architects and developers to collaborate on this project. Collaborators can create features, update stages, link design docs, and connect their own AI coding agents.
                 </p>
 
-                <div className="p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-200 space-y-3">
-                  <div>
-                    <div className="text-[11px] font-mono text-indigo-900 font-bold mb-1">
-                      DIRECT INVITE LINK (SLACK / EMAIL)
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        readOnly
-                        value={inviteUrl}
-                        className="flex-1 bg-white border border-indigo-200 rounded-lg px-3 py-2 text-xs font-mono text-slate-800 shadow-2xs"
-                      />
-                      <button
-                        onClick={() => copyText(inviteUrl, "invite-url")}
-                        className="px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs inline-flex items-center gap-1.5 shrink-0 shadow-xs"
-                      >
-                        {copiedId === "invite-url" ? (
-                          <>
-                            <Check className="w-3.5 h-3.5" /> Copied
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5" /> Copy Link
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-indigo-100 flex items-center justify-between">
+                {currentProject.inviteCode ? (
+                  <div className="p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-200 space-y-3">
                     <div>
-                      <div className="text-[11px] font-mono text-indigo-900 font-bold">
-                        PROJECT SHORT CODE
+                      <div className="text-[11px] font-mono text-indigo-900 font-bold mb-1">
+                        DIRECT INVITE LINK (SLACK / EMAIL)
                       </div>
-                      <div className="text-xs text-slate-500">
-                        Teammates can paste this into &ldquo;Join Project&rdquo;
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={inviteUrl}
+                          className="flex-1 bg-white border border-indigo-200 rounded-lg px-3 py-2 text-xs font-mono text-slate-800 shadow-2xs"
+                        />
+                        <button
+                          onClick={() => copyText(inviteUrl, "invite-url")}
+                          className="px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs inline-flex items-center gap-1.5 shrink-0 shadow-xs"
+                        >
+                          {copiedId === "invite-url" ? (
+                            <>
+                              <Check className="w-3.5 h-3.5" /> Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" /> Copy Link
+                            </>
+                          )}
+                        </button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-sm text-indigo-800 bg-white px-3 py-1.5 rounded-lg border border-indigo-200 tracking-wider">
-                        {currentProject.inviteCode || "KZ-..."}
-                      </span>
-                      <button
-                        onClick={() =>
-                          copyText(currentProject.inviteCode || "", "invite-code")
-                        }
-                        className="p-1.5 rounded-lg bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 text-xs font-semibold shadow-2xs"
-                        title="Copy Code"
-                      >
-                        {copiedId === "invite-code" ? (
-                          <Check className="w-3.5 h-3.5" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </div>
 
-                {isOwner && (
-                  <div className="flex justify-between items-center pt-2">
-                    <button
-                      onClick={handleRotateInviteCode}
-                      className="px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-xs font-semibold text-amber-800 border border-amber-300 shadow-2xs"
-                      title="Deactivates current code and generates a new random code"
-                    >
-                      Rotate Invite Code
-                    </button>
-                    <span className="text-[11px] text-slate-400">
-                      Only project owner can rotate
-                    </span>
+                    <div className="pt-2 border-t border-indigo-100 flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-mono text-indigo-900 font-bold">
+                            ACTIVE SHORT CODE
+                          </span>
+                          {(() => {
+                            const active = currentProject.invites?.find(
+                              (i) => i.code === currentProject.inviteCode
+                            );
+                            if (!active?.expiresAt) return null;
+                            const diffDays = Math.max(
+                              0,
+                              Math.ceil(
+                                (new Date(active.expiresAt).getTime() - Date.now()) /
+                                  (1000 * 60 * 60 * 24)
+                              )
+                            );
+                            return (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-100 text-indigo-800">
+                                <Clock className="w-3 h-3 text-indigo-600" />
+                                Expires in {diffDays}d
+                              </span>
+                            );
+                          })()}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          Teammates can paste this into &ldquo;Join Project&rdquo;
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-sm text-indigo-800 bg-white px-3 py-1.5 rounded-lg border border-indigo-200 tracking-wider">
+                          {currentProject.inviteCode}
+                        </span>
+                        <button
+                          onClick={() =>
+                            copyText(currentProject.inviteCode || "", "invite-code")
+                          }
+                          className="p-1.5 rounded-lg bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 text-xs font-semibold shadow-2xs"
+                          title="Copy Code"
+                        >
+                          {copiedId === "invite-code" ? (
+                            <Check className="w-3.5 h-3.5" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {isOwner && (
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-indigo-100">
+                        <button
+                          onClick={handleRotateInviteCode}
+                          className="px-3 py-1.5 rounded-lg bg-white hover:bg-amber-50 text-xs font-semibold text-amber-800 border border-amber-300 shadow-2xs transition"
+                          title="Deactivates current code and generates a new 7-day random code"
+                        >
+                          Rotate Code
+                        </button>
+                        <button
+                          onClick={() => handleDeactivateInviteCode()}
+                          className="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-xs font-semibold text-rose-700 border border-rose-200 shadow-2xs transition flex items-center gap-1.5"
+                          title="Immediately deactivates all active invite codes"
+                        >
+                          <Ban className="w-3.5 h-3.5" /> Deactivate Code
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center space-y-3">
+                    <p className="text-xs text-slate-600">
+                      There are no active invite codes for this project. Invite codes expire after 7 days or can be deactivated at any time.
+                    </p>
+                    {isOwner && (
+                      <button
+                        onClick={handleRotateInviteCode}
+                        className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm transition inline-flex items-center gap-2"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Generate Invite Code (7-Day Expiry)
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Invite History */}
+                {currentProject.invites && currentProject.invites.length > 0 && (
+                  <div className="space-y-2 pt-2">
+                    <div className="text-[11px] font-mono font-bold text-slate-500 uppercase tracking-wider">
+                      Invite Code History
+                    </div>
+                    <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 max-h-48 overflow-y-auto bg-white">
+                      {currentProject.invites.map((inv) => {
+                        const isExpired = inv.isExpired;
+                        const isActive = inv.isActive && !isExpired;
+                        return (
+                          <div
+                            key={inv.id}
+                            className="p-2.5 flex items-center justify-between text-xs hover:bg-slate-50 transition"
+                          >
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-bold text-slate-800">
+                                  {inv.code}
+                                </span>
+                                {isActive ? (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
+                                    Active
+                                  </span>
+                                ) : isExpired ? (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
+                                    Expired
+                                  </span>
+                                ) : (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-500">
+                                    Deactivated
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-slate-400 flex items-center gap-2">
+                                <span>
+                                  {inv.usesCount} {inv.usesCount === 1 ? "use" : "uses"}
+                                </span>
+                                <span>•</span>
+                                <span>Created {new Date(inv.createdAt).toLocaleDateString()}</span>
+                                {inv.expiresAt && (
+                                  <>
+                                    <span>•</span>
+                                    <span>
+                                      {isExpired
+                                        ? `Expired ${new Date(inv.expiresAt).toLocaleDateString()}`
+                                        : `Expires ${new Date(inv.expiresAt).toLocaleDateString()}`}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            {isOwner && isActive && (
+                              <button
+                                onClick={() => handleDeactivateInviteCode(inv.id)}
+                                className="px-2 py-1 rounded text-[11px] font-medium text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition shrink-0"
+                                title="Deactivate this invite code immediately"
+                              >
+                                Deactivate
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>

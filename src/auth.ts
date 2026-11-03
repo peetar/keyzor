@@ -65,8 +65,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         Boolean(user) ||
         !token.userId ||
         token.userId === "usr_architect_peter" ||
-        token.userId === "usr_8f2f12b903d2" ||
-        !token.migratedV3;
+        !token.migratedV4;
 
       if (resolvedEmail && needsSync) {
         try {
@@ -79,7 +78,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           token.userId = dbUser.id;
           token.email = dbUser.email;
           token.name = dbUser.name;
-          token.migratedV3 = true;
+          token.migratedV4 = true;
         } catch (e) {
           console.error("Error syncing user in auth jwt callback:", e);
         }
@@ -95,9 +94,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           (typeof token?.email === "string" ? token.email : "");
 
         if (
-          (!resolvedUserId ||
-            resolvedUserId === "usr_architect_peter" ||
-            resolvedUserId === "usr_8f2f12b903d2") &&
+          (!resolvedUserId || resolvedUserId === "usr_architect_peter") &&
           email
         ) {
           try {

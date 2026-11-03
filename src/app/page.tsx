@@ -6,7 +6,10 @@ import { KeyzorDashboard } from "@/components/keyzor-dashboard";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
+export default async function HomePage(props: {
+  searchParams?: Promise<{ project?: string; joined?: string }>;
+}) {
+  const searchParams = props.searchParams ? await props.searchParams : undefined;
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -22,6 +25,7 @@ export default async function HomePage() {
   return (
     <KeyzorDashboard
       initialProjects={projects}
+      initialSelectedProjectId={searchParams?.project}
       defaultApiKey=""
       userEmail={userEmail}
       userName={userName}

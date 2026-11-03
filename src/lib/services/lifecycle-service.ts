@@ -97,6 +97,16 @@ export interface ProjectAccessRequestInfo {
   createdAt: string;
 }
 
+export interface ProjectInviteInfo {
+  id: string;
+  code: string;
+  isActive: boolean;
+  usesCount: number;
+  createdAt: string;
+  expiresAt: string | null;
+  isExpired: boolean;
+}
+
 export interface EnrichedProject {
   id: string;
   ownerId: string;
@@ -109,6 +119,7 @@ export interface EnrichedProject {
   shareEnabled: boolean;
   encryptedShareToken: string;
   inviteCode?: string;
+  invites?: ProjectInviteInfo[];
   collaborators?: ProjectCollaboratorInfo[];
   pendingRequests?: ProjectAccessRequestInfo[];
   pendingRequestsCount?: number;
@@ -191,11 +202,12 @@ function computeFourQuestions(
 
 function generateInviteCode(): string {
   const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
-  let code = "KZ-";
-  for (let i = 0; i < 5; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return code;
+  const bytes = crypto.randomBytes(10);
+  let p1 = "";
+  let p2 = "";
+  for (let i = 0; i < 5; i++) p1 += chars[bytes[i] % chars.length];
+  for (let i = 5; i < 10; i++) p2 += chars[bytes[i] % chars.length];
+  return `KZ-${p1}-${p2}`;
 }
 
 export async function listProjects(forUserId?: string): Promise<EnrichedProject[]> {
@@ -326,18 +338,26 @@ export async function getProjectByIdOrSlug(
     })),
   ];
 
-  // Active invite code
-  const inviteRows = await db
+  // All project invites
+  const allInviteRows = await db
     .select()
     .from(schema.projectInvites)
-    .where(
-      and(
-        eq(schema.projectInvites.projectId, project.id),
-        eq(schema.projectInvites.isActive, true)
-      )
-    )
-    .orderBy(desc(schema.projectInvites.createdAt))
-    .limit(1);
+    .where(eq(schema.projectInvites.projectId, project.id))
+    .orderBy(desc(schema.projectInvites.createdAt));
+
+  const now = new Date();
+  const projectInvitesList: ProjectInviteInfo[] = allInviteRows.map((inv) => {
+    const isExpired = Boolean(inv.expiresAt && new Date(inv.expiresAt) < now);
+    return {
+      id: inv.id,
+      code: inv.code,
+      isActive: inv.isActive,
+      usesCount: inv.usesCount,
+      createdAt: inv.createdAt.toISOString(),
+      expiresAt: inv.expiresAt ? inv.expiresAt.toISOString() : null,
+      isExpired,
+    };
+  });
 
   // Determine userRole
   let userRole: "owner" | "editor" | null = null;
@@ -356,22 +376,10 @@ export async function getProjectByIdOrSlug(
     return null;
   }
 
-  let inviteCode = inviteRows[0]?.code;
-  if (!inviteCode && userRole === "owner") {
-    inviteCode = generateInviteCode();
-    await db.insert(schema.projectInvites).values({
-      id: `inv_${crypto.randomBytes(5).toString("hex")}`,
-      projectId: project.id,
-      code: inviteCode,
-      createdBy: project.ownerId,
-      isActive: true,
-      usesCount: 0,
-    });
-  }
-
-  if (userRole !== "owner") {
-    inviteCode = "";
-  }
+  const activeNonExpired = projectInvitesList.find(
+    (inv) => inv.isActive && !inv.isExpired
+  );
+  const inviteCode = userRole === "owner" ? activeNonExpired?.code || "" : "";
 
   // Pending requests if owner
   let pendingRequests: ProjectAccessRequestInfo[] = [];
@@ -427,6 +435,7 @@ export async function getProjectByIdOrSlug(
       project.shareVersion
     ),
     inviteCode,
+    invites: projectInvitesList,
     collaborators,
     pendingRequests,
     pendingRequestsCount: pendingRequests.length,
@@ -1178,14 +1187,7 @@ export async function getOrCreateUser(input: {
   provider: string;
 }> {
   await ensureDatabaseReady();
-  const rawNormalizedEmail = input.email.trim().toLowerCase();
-  const normalizedEmail = [
-    "tricepeter@gmail.com",
-    "trice.peter@gmail.com",
-    "peetar@users.noreply.github.com",
-  ].includes(rawNormalizedEmail)
-    ? "peter.trice@gmail.com"
-    : rawNormalizedEmail;
+  const normalizedEmail = input.email.trim().toLowerCase();
 
   const existing = await db
     .select()
@@ -1219,10 +1221,6 @@ export async function getOrCreateUser(input: {
       provider: input.provider || "oauth",
     };
     await db.insert(schema.users).values(user);
-  }
-
-  if (user.email === "peter.trice@gmail.com") {
-    await reconcileLegacyDefaultUserAssets(db, user.id);
   }
 
   return user;
@@ -1277,7 +1275,8 @@ export async function getProjectPermission(
 
 export async function getOrCreateProjectInvite(
   projectIdOrSlug: string,
-  userId: string
+  userId: string,
+  expiresInDays = 7
 ): Promise<{ code: string }> {
   await ensureDatabaseReady();
   const perm = await getProjectPermission(projectIdOrSlug, userId);
@@ -1285,6 +1284,7 @@ export async function getOrCreateProjectInvite(
     throw new Error("Project not found or unauthorized.");
   }
 
+  const now = new Date();
   const activeInvites = await db
     .select()
     .from(schema.projectInvites)
@@ -1295,11 +1295,16 @@ export async function getOrCreateProjectInvite(
       )
     );
 
-  if (activeInvites.length > 0) {
-    return { code: activeInvites[0].code };
+  const nonExpired = activeInvites.find(
+    (inv) => !inv.expiresAt || new Date(inv.expiresAt) > now
+  );
+
+  if (nonExpired) {
+    return { code: nonExpired.code };
   }
 
   const code = generateInviteCode();
+  const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
   await db.insert(schema.projectInvites).values({
     id: `inv_${crypto.randomBytes(5).toString("hex")}`,
     projectId: perm.project.id,
@@ -1307,6 +1312,7 @@ export async function getOrCreateProjectInvite(
     createdBy: userId,
     isActive: true,
     usesCount: 0,
+    expiresAt,
   });
 
   return { code };
@@ -1314,7 +1320,8 @@ export async function getOrCreateProjectInvite(
 
 export async function rotateProjectInvite(
   projectIdOrSlug: string,
-  userId: string
+  userId: string,
+  expiresInDays = 7
 ): Promise<{ code: string }> {
   await ensureDatabaseReady();
   const perm = await getProjectPermission(projectIdOrSlug, userId);
@@ -1328,6 +1335,7 @@ export async function rotateProjectInvite(
     .where(eq(schema.projectInvites.projectId, perm.project.id));
 
   const code = generateInviteCode();
+  const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
   await db.insert(schema.projectInvites).values({
     id: `inv_${crypto.randomBytes(5).toString("hex")}`,
     projectId: perm.project.id,
@@ -1335,6 +1343,7 @@ export async function rotateProjectInvite(
     createdBy: userId,
     isActive: true,
     usesCount: 0,
+    expiresAt,
   });
 
   await db.insert(schema.activityLogs).values({
@@ -1343,10 +1352,47 @@ export async function rotateProjectInvite(
     actorType: "human",
     actorName: "Project Owner",
     action: "Rotated Invite Code",
-    details: `Generated new invite code ${code}.`,
+    details: `Generated new invite code ${code} (expires in ${expiresInDays} days).`,
   });
 
   return { code };
+}
+
+export async function deactivateProjectInvite(
+  projectIdOrSlug: string,
+  userId: string,
+  inviteId?: string
+): Promise<{ success: boolean }> {
+  await ensureDatabaseReady();
+  const perm = await getProjectPermission(projectIdOrSlug, userId);
+  if (!perm.project || perm.role !== "owner") {
+    throw new Error("Only the project owner can deactivate invite codes.");
+  }
+
+  const condition = inviteId
+    ? and(
+        eq(schema.projectInvites.projectId, perm.project.id),
+        eq(schema.projectInvites.id, inviteId)
+      )
+    : eq(schema.projectInvites.projectId, perm.project.id);
+
+  await db
+    .update(schema.projectInvites)
+    .set({ isActive: false })
+    .where(condition);
+
+  await db.insert(schema.activityLogs).values({
+    id: `act_${crypto.randomBytes(5).toString("hex")}`,
+    projectId: perm.project.id,
+    actorType: "human",
+    actorName: "Project Owner",
+    action: "Deactivated Invite Code",
+    details: inviteId
+      ? `Deactivated invite code id ${inviteId}.`
+      : "Deactivated all project invite codes.",
+  });
+
+  return { success: true };
 }
 
 export async function joinProjectWithCode(
@@ -1371,6 +1417,10 @@ export async function joinProjectWithCode(
   }
 
   const invite = invites[0];
+  if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
+    throw new Error("This invite code has expired.");
+  }
+
   const project = (
     await db
       .select()

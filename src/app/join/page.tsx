@@ -28,7 +28,11 @@ export default async function JoinProjectPage(props: {
 
   // If user is authenticated and has a code, attempt to join automatically
   let autoJoinedProject = null;
-  let joinError = searchParams.error || null;
+  let joinError =
+    searchParams.error && searchParams.error !== "NEXT_REDIRECT"
+      ? searchParams.error
+      : null;
+  let autoRedirectUrl: string | null = null;
 
   if (session?.user && code) {
     try {
@@ -38,11 +42,17 @@ export default async function JoinProjectPage(props: {
         email: session.user.email || "",
       };
       autoJoinedProject = await joinProjectWithCode(code, user);
-      // Successfully joined, redirect to homepage with project loaded
-      redirect(`/?project=${autoJoinedProject.id}&joined=1`);
-    } catch (err) {
-      joinError = (err as Error).message;
+      autoRedirectUrl = `/?project=${autoJoinedProject.id}&joined=1`;
+    } catch (err: any) {
+      if (err?.digest?.startsWith?.("NEXT_REDIRECT") || err?.message === "NEXT_REDIRECT") {
+        throw err;
+      }
+      joinError = err?.message || "Failed to join project.";
     }
+  }
+
+  if (autoRedirectUrl) {
+    redirect(autoRedirectUrl);
   }
 
   return (
@@ -140,17 +150,32 @@ export default async function JoinProjectPage(props: {
                 "use server";
                 const inputCode = (formData.get("code") as string)?.trim().toUpperCase() || code;
                 if (!inputCode) return;
+
+                let targetUrl: string | null = null;
+                let errorRedirectUrl: string | null = null;
+
                 try {
                   const s = await auth();
                   if (!s?.user) return;
-                  await joinProjectWithCode(inputCode, {
+                  const joined = await joinProjectWithCode(inputCode, {
                     id: s.user.id || "",
                     name: s.user.name || "Collaborator",
                     email: s.user.email || "",
                   });
-                  redirect("/?joined=1");
-                } catch (e) {
-                  redirect(`/join?code=${inputCode}&error=${encodeURIComponent((e as Error).message)}`);
+                  targetUrl = `/?project=${joined.id}&joined=1`;
+                } catch (e: any) {
+                  if (e?.digest?.startsWith?.("NEXT_REDIRECT") || e?.message === "NEXT_REDIRECT") {
+                    throw e;
+                  }
+                  errorRedirectUrl = `/join?code=${inputCode}&error=${encodeURIComponent(
+                    e?.message || "Failed to join project."
+                  )}`;
+                }
+
+                if (targetUrl) {
+                  redirect(targetUrl);
+                } else if (errorRedirectUrl) {
+                  redirect(errorRedirectUrl);
                 }
               }}
               className="space-y-3"

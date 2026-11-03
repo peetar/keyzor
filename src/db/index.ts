@@ -196,8 +196,12 @@ export async function ensureDatabaseReady(): Promise<void> {
         created_by TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         is_active BOOLEAN NOT NULL DEFAULT TRUE,
         uses_count INTEGER NOT NULL DEFAULT 0,
+        expires_at TIMESTAMP,
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
       )
+    `);
+    await activeDb.execute(sql`
+      ALTER TABLE project_invites ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;
     `);
 
     await activeDb.execute(sql`
@@ -233,36 +237,6 @@ export async function ensureDatabaseReady(): Promise<void> {
     await activeDb
       .delete(schema.users)
       .where(sql`email LIKE '%@example.com'`);
-
-    // Reconcile any legacy projects/API keys created under DEFAULT_USER_ID or legacy tricepeter@gmail.com
-    // directly to the canonical GitHub OAuth account (peter.trice@gmail.com)
-    const canonicalEmail = "peter.trice@gmail.com";
-    let canonicalUserRows = await activeDb
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.email, canonicalEmail));
-
-    if (canonicalUserRows.length === 0) {
-      const canonicalId = "usr_peter_trice";
-      await activeDb
-        .insert(schema.users)
-        .values({
-          id: canonicalId,
-          email: canonicalEmail,
-          name: "Peter Trice",
-          provider: "github",
-        })
-        .onConflictDoNothing();
-      canonicalUserRows = await activeDb
-        .select()
-        .from(schema.users)
-        .where(eq(schema.users.email, canonicalEmail));
-    }
-
-    const primaryOwner = canonicalUserRows[0];
-    if (primaryOwner) {
-      await reconcileLegacyDefaultUserAssets(activeDb, primaryOwner.id);
-    }
   })();
 
   return globalForDb.__keyzorInitPromise;
@@ -283,12 +257,12 @@ export async function reconcileLegacyDefaultUserAssets(
 ): Promise<void> {
   if (!targetUserId || targetUserId === DEFAULT_USER_ID) return;
 
-  // Find any legacy duplicate user rows (DEFAULT_USER_ID or typo/legacy tricepeter@gmail.com)
+  // Find any legacy default placeholder rows
   const legacyUsers = await activeDb
     .select()
     .from(schema.users)
     .where(
-      sql`id = ${DEFAULT_USER_ID} OR LOWER(email) IN ('tricepeter@gmail.com', 'trice.peter@gmail.com', 'architect@kazor.app', 'architect@keyzor.vercel.app')`
+      sql`id = ${DEFAULT_USER_ID} OR LOWER(email) IN ('architect@kazor.app', 'architect@keyzor.vercel.app')`
     );
 
   const sourceUserIds = Array.from(
