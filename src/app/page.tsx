@@ -21,11 +21,14 @@ export default async function HomePage(props: {
 
   const userEmail = session.user.email || "";
   const userName = session.user.name || "Architect";
+  const creatorSlug = (session.user as any).username || (userEmail ? userEmail.split("@")[0] : "creator");
 
   return (
     <KeyzorDashboard
+      mode="home"
       initialProjects={projects}
       initialSelectedProjectId={searchParams?.project}
+      creatorSlug={creatorSlug}
       defaultApiKey=""
       userEmail={userEmail}
       userName={userName}

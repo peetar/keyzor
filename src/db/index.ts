@@ -81,6 +81,7 @@ export async function ensureDatabaseReady(): Promise<void> {
         id TEXT PRIMARY KEY,
         email TEXT NOT NULL UNIQUE,
         name TEXT NOT NULL,
+        username TEXT,
         image TEXT,
         provider TEXT NOT NULL DEFAULT 'credentials',
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -103,7 +104,7 @@ export async function ensureDatabaseReady(): Promise<void> {
       CREATE TABLE IF NOT EXISTS projects (
         id TEXT PRIMARY KEY,
         owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        slug TEXT NOT NULL UNIQUE,
+        slug TEXT NOT NULL,
         name TEXT NOT NULL,
         description TEXT NOT NULL DEFAULT '',
         share_enabled BOOLEAN NOT NULL DEFAULT TRUE,
@@ -215,6 +216,40 @@ export async function ensureDatabaseReady(): Promise<void> {
         reviewed_at TIMESTAMP
       )
     `);
+
+    // Migrations for username column & per-owner project slug uniqueness
+    try {
+      await activeDb.execute(sql`
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT;
+      `);
+    } catch {}
+
+    try {
+      await activeDb.execute(sql`
+        ALTER TABLE projects DROP CONSTRAINT IF EXISTS projects_slug_unique;
+      `);
+    } catch {}
+
+    try {
+      await activeDb.execute(sql`
+        ALTER TABLE projects DROP CONSTRAINT IF EXISTS projects_slug_key;
+      `);
+    } catch {}
+
+    try {
+      await activeDb.execute(sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS projects_owner_slug_idx ON projects (owner_id, slug);
+      `);
+    } catch {}
+
+    try {
+      await activeDb.execute(sql`
+        UPDATE users
+        SET username = 'petertrice'
+        WHERE (id = 'usr_architect_peter' OR LOWER(email) LIKE '%peter%' OR LOWER(name) LIKE '%peter%')
+          AND (username IS NULL OR username = '');
+      `);
+    } catch {}
 
     const existingUsers = await activeDb
       .select()

@@ -8,6 +8,9 @@ import {
   FeatureGanttView,
   LinkBadge,
   ScheduleHealthBadge,
+  formatDisplayDate,
+  formatShortDate,
+  getStageProgressDotClass,
 } from "./flowchart-gantt-views";
 import {
   ShieldCheck,
@@ -16,6 +19,16 @@ import {
   Layers,
   Lock,
 } from "lucide-react";
+
+function dedupLinks<T extends { url: string }>(links: T[]): T[] {
+  const seen = new Set<string>();
+  return links.filter((l) => {
+    const key = (l.url || "").trim().toLowerCase().replace(/\/+$/, "");
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 export function StakeholderShareView({
   project,
@@ -69,9 +82,8 @@ export function StakeholderShareView({
                 <tr className="border-b border-slate-200 text-[11px] font-mono uppercase text-slate-600 bg-slate-50 font-semibold">
                   <th className="py-2.5 px-4">Feature</th>
                   <th className="py-2.5 px-4">Stage</th>
-                  <th className="py-2.5 px-4">Current Owner</th>
-                  <th className="py-2.5 px-4">Target</th>
-                  <th className="py-2.5 px-4">Projected</th>
+                  <th className="py-2.5 px-4 min-w-[160px]">Current Owner</th>
+                  <th className="py-2.5 px-4">Timeline</th>
                   <th className="py-2.5 px-4">Deliverable Links</th>
                 </tr>
               </thead>
@@ -96,31 +108,50 @@ export function StakeholderShareView({
                       </div>
                     </td>
                     <td className="py-3 px-4">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold whitespace-nowrap">
-                        {feat.fourQuestions.where.stageName} (
-                        {feat.fourQuestions.where.percentComplete}%)
-                      </span>
+                      <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold">
+                        <span
+                          className={`w-2 h-2 rounded-full ${getStageProgressDotClass(
+                            feat.fourQuestions.where.stageIndex,
+                            feat.fourQuestions.where.totalStages
+                          )} shrink-0`}
+                        />
+                        <span className="whitespace-nowrap">{feat.fourQuestions.where.stageName}</span>
+                        <span className="text-slate-500 font-mono text-[11px] whitespace-nowrap">
+                          ({feat.fourQuestions.where.stageIndex + 1}/{feat.fourQuestions.where.totalStages})
+                        </span>
+                      </div>
                     </td>
-                    <td className="py-3 px-4 text-xs text-slate-700 font-medium">
-                      {feat.fourQuestions.who}
-                    </td>
-                    <td className="py-3 px-4 font-mono text-xs text-slate-600 font-semibold whitespace-nowrap">
-                      {feat.fourQuestions.whenWantDone || "—"}
+                    <td className="py-3 px-4 text-xs text-slate-700 font-medium min-w-[160px] max-w-[220px]">
+                      <div className="line-clamp-2 sm:line-clamp-3 leading-snug cursor-help" title={feat.fourQuestions.who}>
+                        {feat.fourQuestions.who}
+                      </div>
                     </td>
                     <td className="py-3 px-4">
-                      <div className="flex items-center gap-2 whitespace-nowrap">
+                      <div
+                        className="flex items-center gap-2 whitespace-nowrap cursor-help"
+                        title={`Projected: ${formatDisplayDate(feat.fourQuestions.whenExpectDone)}${
+                          feat.fourQuestions.whenWantDone
+                            ? ` • Target: ${formatDisplayDate(feat.fourQuestions.whenWantDone)}`
+                            : ""
+                        }`}
+                      >
                         <span className="font-mono text-xs text-slate-900 font-bold shrink-0">
-                          {feat.fourQuestions.whenExpectDone || "—"}
+                          {formatDisplayDate(feat.fourQuestions.whenExpectDone)}
                         </span>
                         <ScheduleHealthBadge feature={feat} />
                       </div>
+                      {feat.fourQuestions.whenWantDone && (
+                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                          Target: {formatDisplayDate(feat.fourQuestions.whenWantDone)}
+                        </div>
+                      )}
                     </td>
                     <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
                       <div className="flex flex-wrap gap-1.5">
-                        {feat.links.map((l) => (
+                        {dedupLinks(feat.links).map((l) => (
                           <LinkBadge key={l.id} link={l} />
                         ))}
-                        {feat.links.length === 0 && (
+                        {dedupLinks(feat.links).length === 0 && (
                           <span className="text-xs text-slate-400">—</span>
                         )}
                       </div>
@@ -193,7 +224,7 @@ export function StakeholderShareView({
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {feature.links.map((lnk) => (
+                  {dedupLinks(feature.links).map((lnk) => (
                     <LinkBadge key={lnk.id} link={lnk} />
                   ))}
                 </div>

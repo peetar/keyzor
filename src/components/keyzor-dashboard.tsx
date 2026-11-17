@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { signOutAction } from "@/app/actions/auth-actions";
 import type {
   EnrichedProject,
@@ -13,6 +15,9 @@ import {
   FeatureGanttView,
   LinkBadge,
   ScheduleHealthBadge,
+  formatDisplayDate,
+  formatShortDate,
+  getStageProgressDotClass,
 } from "./flowchart-gantt-views";
 import {
   BarChart3,
@@ -42,7 +47,24 @@ import {
   Lock,
   Clock,
   Ban,
+  Home,
+  ArrowLeft,
+  FolderGit2,
+  Search,
+  ChevronDown,
+  ChevronUp,
+  ChevronsUpDown,
 } from "lucide-react";
+
+function dedupLinks<T extends { url: string }>(links: T[]): T[] {
+  const seen = new Set<string>();
+  return links.filter((l) => {
+    const key = (l.url || "").trim().toLowerCase().replace(/\/+$/, "");
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 interface KeyzorDashboardProps {
   initialProjects: EnrichedProject[];
@@ -51,6 +73,10 @@ interface KeyzorDashboardProps {
   userEmail: string;
   userName: string;
   currentUserId?: string;
+  mode?: "home" | "project" | "feature";
+  focusedFeatureId?: string;
+  creatorSlug?: string;
+  projectSlug?: string;
 }
 
 export function KeyzorDashboard({
@@ -60,7 +86,12 @@ export function KeyzorDashboard({
   userEmail,
   userName,
   currentUserId,
+  mode = "home",
+  focusedFeatureId,
+  creatorSlug,
+  projectSlug,
 }: KeyzorDashboardProps) {
+  const router = useRouter();
   const [projects, setProjects] = useState<EnrichedProject[]>(initialProjects);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
     initialSelectedProjectId && initialProjects.some((p) => p.id === initialSelectedProjectId)
@@ -78,6 +109,7 @@ export function KeyzorDashboard({
   const [showShareModal, setShowShareModal] = useState(false);
   const [showNewFeatureModal, setShowNewFeatureModal] = useState(false);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+  const [createProjectError, setCreateProjectError] = useState<string | null>(null);
 
   // Sharing & Collaboration Modals & State
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -129,6 +161,27 @@ export function KeyzorDashboard({
 
   const currentProject =
     projects.find((p) => p.id === selectedProjectId) || projects[0];
+
+  const effectiveCreatorSlug =
+    creatorSlug ||
+    currentProject?.creatorSlug ||
+    (currentProject?.ownerEmail ? currentProject.ownerEmail.split("@")[0] : "creator");
+
+  const focusedFeature =
+    focusedFeatureId && currentProject
+      ? currentProject.features.find(
+          (f) =>
+            f.id === focusedFeatureId ||
+            f.slug.toLowerCase() === focusedFeatureId.toLowerCase()
+        ) || null
+      : null;
+
+  const displayFeatures =
+    mode === "feature" && focusedFeature
+      ? [focusedFeature]
+      : currentProject
+      ? currentProject.features
+      : [];
 
   const copyText = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -208,6 +261,88 @@ export function KeyzorDashboard({
       setIsLoading(false);
     }
   };
+
+  const handleQuickReturn = async (feature: EnrichedFeature) => {
+    setIsLoading(true);
+    try {
+      await fetch(`/api/v1/features/${feature.id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "return",
+          actorName: userName,
+          actorType: "human",
+        }),
+      });
+      await refreshProjects(currentProject?.id);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Table search, filter, and sort state (Item 1.1)
+  const [tableSearch, setTableSearch] = useState("");
+  const [stageFilter, setStageFilter] = useState<string>("all");
+  const [ownerFilter, setOwnerFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"title" | "stage" | "owner" | "timeline">("title");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+
+  const uniqueOwners = useMemo(() => {
+    const set = new Set<string>();
+    displayFeatures.forEach((f) => {
+      const o = f.fourQuestions?.who || f.currentOwner;
+      if (o && o.trim()) set.add(o.trim());
+    });
+    return Array.from(set).sort();
+  }, [displayFeatures]);
+
+  const filteredFeatures = useMemo(() => {
+    return displayFeatures
+      .filter((feat) => {
+        if (tableSearch.trim()) {
+          const q = tableSearch.toLowerCase();
+          const matchTitle = feat.title.toLowerCase().includes(q);
+          const matchSummary = (feat.summary || "").toLowerCase().includes(q);
+          const matchOwner = (feat.currentOwner || feat.fourQuestions?.who || "").toLowerCase().includes(q);
+          const matchStage = (feat.fourQuestions?.where?.stageName || "").toLowerCase().includes(q);
+          if (!matchTitle && !matchSummary && !matchOwner && !matchStage) {
+            return false;
+          }
+        }
+        if (stageFilter !== "all") {
+          const stageIdx = feat.fourQuestions?.where?.stageIndex;
+          if (stageIdx !== undefined && String(stageIdx + 1) !== stageFilter) {
+            return false;
+          }
+        }
+        if (ownerFilter !== "all") {
+          const owner = feat.fourQuestions?.who || feat.currentOwner || "";
+          if (!owner.toLowerCase().includes(ownerFilter.toLowerCase())) {
+            return false;
+          }
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        let cmp = 0;
+        if (sortBy === "title") {
+          cmp = a.title.localeCompare(b.title);
+        } else if (sortBy === "stage") {
+          const aIdx = a.fourQuestions?.where?.stageIndex ?? 0;
+          const bIdx = b.fourQuestions?.where?.stageIndex ?? 0;
+          cmp = aIdx - bIdx;
+        } else if (sortBy === "owner") {
+          const aOwner = a.fourQuestions?.who || a.currentOwner || "";
+          const bOwner = b.fourQuestions?.who || b.currentOwner || "";
+          cmp = aOwner.localeCompare(bOwner);
+        } else if (sortBy === "timeline") {
+          const aDate = a.fourQuestions?.whenExpectDone || a.expectedDate || "";
+          const bDate = b.fourQuestions?.whenExpectDone || b.expectedDate || "";
+          cmp = aDate.localeCompare(bDate);
+        }
+        return sortOrder === "asc" ? cmp : -cmp;
+      });
+  }, [displayFeatures, tableSearch, stageFilter, ownerFilter, sortBy, sortOrder]);
 
   const handleSaveFeatureUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -289,6 +424,7 @@ export function KeyzorDashboard({
     e.preventDefault();
     if (!newProjName.trim()) return;
     setIsLoading(true);
+    setCreateProjectError(null);
     try {
       const res = await fetch("/api/v1/projects", {
         method: "POST",
@@ -301,10 +437,20 @@ export function KeyzorDashboard({
         }),
       });
       const json = await res.json();
+      if (!res.ok || !json.ok) {
+        setCreateProjectError(json.error || "Failed to create project.");
+        return;
+      }
       setNewProjName("");
       setNewProjDesc("");
       setShowNewProjectModal(false);
-      await refreshProjects(json.data?.project?.id);
+      const createdProj = json.data?.project;
+      if (createdProj) {
+        const creator = createdProj.creatorSlug || effectiveCreatorSlug;
+        router.push(`/${creator}/${createdProj.slug}`);
+      } else {
+        await refreshProjects();
+      }
     } finally {
       setIsLoading(false);
     }
@@ -497,8 +643,14 @@ export function KeyzorDashboard({
         body: JSON.stringify({ name: editProjectNameInput.trim() }),
       });
       if (res.ok) {
+        const json = await res.json();
+        const renamed = json.data?.project;
         setIsEditingProjectName(false);
-        await refreshProjects(currentProject.id);
+        if (renamed && mode === "project") {
+          router.push(`/${renamed.creatorSlug || effectiveCreatorSlug}/${renamed.slug}`);
+        } else {
+          await refreshProjects(currentProject.id);
+        }
       }
     } finally {
       setIsLoading(false);
@@ -514,7 +666,7 @@ export function KeyzorDashboard({
       });
       if (res.ok) {
         setShowDeleteProjectConfirm(false);
-        await refreshProjects();
+        router.push("/");
       }
     } finally {
       setIsLoading(false);
@@ -561,45 +713,72 @@ export function KeyzorDashboard({
 
             <div className="h-5 w-px bg-slate-200 hidden sm:block" />
 
-            {/* Project Selector */}
-            <div className="flex items-center gap-2">
-              <select
-                aria-label="Select Project"
-                value={currentProject?.id || ""}
-                onChange={(e) => setSelectedProjectId(e.target.value)}
-                disabled={projects.length === 0}
-                className="bg-white border border-slate-300 hover:border-indigo-400 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:opacity-60"
-              >
-                {projects.length === 0 ? (
-                  <option value="">No projects</option>
-                ) : (
-                  projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.features.length} features)
-                    </option>
-                  ))
+            {/* Mode-specific Switcher / Buttons */}
+            {mode === "home" ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setJoinErrorMessage(null);
+                    setJoinMessage(null);
+                    setShowJoinModal(true);
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 hover:text-slate-900 text-xs font-semibold transition shadow-2xs"
+                  title="Join Project with Code or Request Access"
+                >
+                  <UserPlus className="w-3.5 h-3.5 text-indigo-600" />
+                  <span className="hidden sm:inline">Join</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setCreateProjectError(null);
+                    setShowNewProjectModal(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition"
+                  title="Create New Project"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>New Project</span>
+                </button>
+              </div>
+            ) : mode === "feature" ? (
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/${effectiveCreatorSlug}/${currentProject?.slug}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 hover:text-slate-900 text-xs font-semibold transition shadow-2xs"
+                  title={`Back to project ${currentProject?.name || ""}`}
+                >
+                  <ArrowLeft className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Back to project</span>
+                </Link>
+                {currentProject && (
+                  <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs font-mono text-slate-700 max-w-[200px] truncate">
+                    <span className="text-slate-500 truncate">{currentProject.name}</span>
+                    <span className="text-slate-400">/</span>
+                    <span className="font-semibold text-indigo-700 truncate">
+                      {focusedFeature?.title || "Feature"}
+                    </span>
+                  </div>
                 )}
-              </select>
-              <button
-                onClick={() => setShowNewProjectModal(true)}
-                className="p-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-600 hover:text-slate-900 transition shadow-2xs"
-                title="Create New Project"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => {
-                  setJoinErrorMessage(null);
-                  setJoinMessage(null);
-                  setShowJoinModal(true);
-                }}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 hover:text-slate-900 text-xs font-semibold transition shadow-2xs"
-                title="Join Project with Code or Request Access"
-              >
-                <UserPlus className="w-3.5 h-3.5 text-indigo-600" />
-                <span className="hidden sm:inline">Join</span>
-              </button>
-            </div>
+              </div>
+            ) : (
+              /* mode === "project" */
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 hover:text-slate-900 text-xs font-semibold transition shadow-2xs"
+                  title="Return to Home"
+                >
+                  <Home className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Home</span>
+                </Link>
+                {currentProject && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs font-mono text-slate-700">
+                    <span className="text-slate-400 font-normal">{effectiveCreatorSlug} /</span>
+                    <span className="font-semibold text-slate-900">{currentProject.slug}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Right Action Controls */}
@@ -614,35 +793,32 @@ export function KeyzorDashboard({
             </button>
 
             {/* Share & Collaborate Button */}
-            <button
-              onClick={() => {
-                setShareModalTab("collaborate");
-                setShowShareModal(true);
-              }}
-              disabled={!currentProject}
-              className="relative inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-800 text-xs font-semibold transition shadow-2xs disabled:opacity-50 disabled:pointer-events-none"
-            >
-              <Users className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Share &amp; Collaborate</span>
-              {currentProject?.pendingRequestsCount && currentProject.pendingRequestsCount > 0 ? (
-                <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping absolute -top-0.5 -right-0.5" />
-              ) : null}
-            </button>
+            {currentProject && mode !== "home" && (
+              <button
+                onClick={() => {
+                  setShareModalTab("collaborate");
+                  setShowShareModal(true);
+                }}
+                className="relative inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-800 text-xs font-semibold transition shadow-2xs"
+              >
+                <Users className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Share &amp; Collaborate</span>
+                {currentProject?.pendingRequestsCount && currentProject.pendingRequestsCount > 0 ? (
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping absolute -top-0.5 -right-0.5" />
+                ) : null}
+              </button>
+            )}
 
             {/* New Feature Flowchart Button */}
-            <button
-              onClick={() => {
-                if (!currentProject) {
-                  setShowNewProjectModal(true);
-                } else {
-                  setShowNewFeatureModal(true);
-                }
-              }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition shadow-sm"
-            >
-              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>New Feature Flow</span>
-            </button>
+            {mode === "project" && currentProject && (
+              <button
+                onClick={() => setShowNewFeatureModal(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition shadow-sm"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>New Feature Flow</span>
+              </button>
+            )}
 
             {/* User Badge & Sign Out */}
             <div className="hidden lg:flex items-center gap-2 pl-2 border-l border-slate-200 text-xs text-slate-500">
@@ -666,241 +842,624 @@ export function KeyzorDashboard({
 
       {/* Main Content Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-6 space-y-6">
-        {!currentProject ? (
+        {mode === "home" ? (
+          projects.length === 0 ? (
+            <div className="flex flex-col items-center justify-center p-12 text-center bg-white border border-slate-200/90 rounded-2xl shadow-xs max-w-lg mx-auto my-16 space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600">
+                <Plus className="w-6 h-6 stroke-[2.5]" />
+              </div>
+              <div className="space-y-1.5">
+                <h2 className="text-lg font-bold text-slate-900">
+                  Create a new project to begin
+                </h2>
+                <p className="text-xs text-slate-500 max-w-sm">
+                  Get started by creating your first project to track feature flowcharts, timelines, and developer handoffs.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setCreateProjectError(null);
+                  setShowNewProjectModal(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition"
+              >
+                <Plus className="w-4 h-4 stroke-[2.5]" />
+                <span>Create Project</span>
+              </button>
+            </div>
+          ) : (
+            <div className="max-w-5xl mx-auto space-y-6 my-2">
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <h1 className="text-xl font-bold text-slate-900">
+                    Welcome to KEYZOR
+                  </h1>
+                  <p className="text-xs text-slate-500 max-w-md">
+                    Select a project to inspect its feature lifecycle, Gantt timeline, and agent handoffs, or initialize a new project roadmap.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setJoinErrorMessage(null);
+                      setJoinMessage(null);
+                      setShowJoinModal(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold shadow-2xs transition"
+                  >
+                    <UserPlus className="w-4 h-4 text-indigo-600" />
+                    <span>Join Project</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCreateProjectError(null);
+                      setShowNewProjectModal(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition"
+                  >
+                    <Plus className="w-4 h-4 stroke-[2.5]" />
+                    <span>Create Project</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xs font-mono uppercase tracking-wider text-slate-500 font-bold">
+                    Your Projects ({projects.length})
+                  </h2>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {projects.map((p) => {
+                    const creator = p.creatorSlug || effectiveCreatorSlug;
+                    const pUrl = `/${creator}/${p.slug}`;
+                    const completedCount = p.features.filter((f) => f.status === "completed").length;
+                    return (
+                      <Link
+                        key={p.id}
+                        href={pUrl}
+                        className="group bg-white border border-slate-200/90 hover:border-indigo-400 rounded-2xl p-5 shadow-xs hover:shadow-md transition flex flex-col justify-between"
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 font-semibold">
+                              {creator} / {p.slug}
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-400 uppercase font-semibold">
+                              {p.userRole || "owner"}
+                            </span>
+                          </div>
+                          <h3 className="text-base font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                            {p.name}
+                          </h3>
+                          {p.description ? (
+                            <p className="text-xs text-slate-500 line-clamp-2">
+                              {p.description}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-slate-400 italic">
+                              No description provided
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+                          <div className="flex items-center gap-3">
+                            <span className="font-semibold text-slate-800">
+                              {p.features.length} feature{p.features.length === 1 ? "" : "s"}
+                            </span>
+                            {completedCount > 0 && (
+                              <span className="text-emerald-600 font-medium">
+                                {completedCount} shipped
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-indigo-600 font-semibold group-hover:translate-x-0.5 transition-transform inline-flex items-center gap-1 text-xs">
+                            View Flowchart →
+                          </span>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )
+        ) : !currentProject ? (
           <div className="flex flex-col items-center justify-center p-12 text-center bg-white border border-slate-200/90 rounded-2xl shadow-xs max-w-lg mx-auto my-16 space-y-4">
             <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600">
               <Plus className="w-6 h-6 stroke-[2.5]" />
             </div>
             <div className="space-y-1.5">
               <h2 className="text-lg font-bold text-slate-900">
-                Create a new project to begin
+                Project Not Found
               </h2>
               <p className="text-xs text-slate-500 max-w-sm">
-                Get started by creating your first project to track feature flowcharts, timelines, and developer handoffs.
+                The requested project could not be found or you do not have permission to view it.
               </p>
             </div>
-            <button
-              onClick={() => setShowNewProjectModal(true)}
+            <Link
+              href="/"
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition"
             >
-              <Plus className="w-4 h-4 stroke-[2.5]" />
-              <span>Create Project</span>
-            </button>
+              <Home className="w-4 h-4" />
+              <span>Back to Home</span>
+            </Link>
+          </div>
+        ) : mode === "feature" && !focusedFeature ? (
+          <div className="flex flex-col items-center justify-center p-12 text-center bg-white border border-slate-200/90 rounded-2xl shadow-xs max-w-lg mx-auto my-16 space-y-4">
+            <div className="space-y-1.5">
+              <h2 className="text-lg font-bold text-slate-900">
+                Feature Not Found
+              </h2>
+              <p className="text-xs text-slate-500 max-w-sm">
+                The feature you requested does not exist in project '{currentProject.name}'.
+              </p>
+            </div>
+            <Link
+              href={`/${effectiveCreatorSlug}/${currentProject.slug}`}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to Project</span>
+            </Link>
           </div>
         ) : (
           <>
-            {/* Project Header & View Mode Toggle */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
-              <div>
-                <div className="flex flex-wrap items-center gap-2.5">
-                  {isEditingProjectName ? (
-                    <div className="flex items-center gap-2">
+            {/* Project / Feature Header Banner */}
+            {mode === "feature" && focusedFeature ? (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link
+                    href={`/${effectiveCreatorSlug}/${currentProject.slug}`}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>{currentProject.name}</span>
+                  </Link>
+                  <span className="text-slate-400">/</span>
+                    <h1 className="text-lg font-bold text-slate-900">
+                      {focusedFeature.title}
+                    </h1>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => openEditor(focusedFeature)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-700 shadow-2xs hover:border-slate-400 hover:text-slate-900 transition"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                      <span>Edit Feature</span>
+                    </button>
+                  <button
+                    onClick={() => refreshProjects(currentProject.id)}
+                    className="p-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 hover:text-indigo-600 transition shadow-2xs"
+                    title="Refresh latest AI agent updates"
+                  >
+                    <RefreshCw
+                      className={`w-4 h-4 ${isLoading ? "animate-spin text-indigo-600" : ""}`}
+                    />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {isEditingProjectName ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={editProjectNameInput}
+                          onChange={(e) => setEditProjectNameInput(e.target.value)}
+                          className="text-lg font-bold text-slate-900 border border-indigo-400 rounded-lg px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                          placeholder="Project name"
+                          autoFocus
+                        />
+                        <button
+                          onClick={handleRenameProject}
+                          className="px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 shadow-2xs"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setIsEditingProjectName(false)}
+                          className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-xs font-semibold hover:bg-slate-200"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <h1 className="text-xl font-bold text-slate-900">
+                          {currentProject.name}
+                        </h1>
+                        {isOwner && (
+                          <button
+                            onClick={() => {
+                              setEditProjectNameInput(currentProject.name);
+                              setIsEditingProjectName(true);
+                            }}
+                            className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-slate-100 transition"
+                            title="Rename Project (Owner Only)"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200 font-medium">
+                      /{currentProject.slug}
+                    </span>
+
+                    {isOwner ? (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
+                        Owner
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200">
+                        Collaborator
+                      </span>
+                    )}
+
+                    {currentProject.pendingRequestsCount && currentProject.pendingRequestsCount > 0 ? (
+                      <button
+                        onClick={() => {
+                          setShareModalTab("requests");
+                          setShowShareModal(true);
+                        }}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 animate-pulse hover:bg-rose-100 transition"
+                      >
+                        <UserCheck className="w-3 h-3 text-rose-600" />
+                        <span>
+                          {currentProject.pendingRequestsCount} Request
+                          {currentProject.pendingRequestsCount > 1 ? "s" : ""}
+                        </span>
+                      </button>
+                    ) : null}
+
+                    {isOwner && (
+                      <button
+                        onClick={() => setShowDeleteProjectConfirm(true)}
+                        className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition ml-1"
+                        title="Delete Project (Owner Only)"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  {currentProject.description && (
+                    <p className="text-sm text-slate-500 mt-1">
+                      {currentProject.description}
+                    </p>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-2 self-start md:self-auto">
+                  <button
+                    onClick={() => refreshProjects(currentProject.id)}
+                    className="p-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 hover:text-indigo-600 transition shadow-2xs"
+                    title="Refresh latest AI agent updates"
+                  >
+                    <RefreshCw
+                      className={`w-4 h-4 ${isLoading ? "animate-spin text-indigo-600" : ""}`}
+                    />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Executive Overview Summary Table */}
+            {currentProject && displayFeatures.length > 0 && (
+              <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
+                {/* Header */}
+                <div className="px-5 py-3 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-indigo-600" />
+                    <h2 className="text-xs font-mono uppercase tracking-wider text-slate-800 font-bold">
+                      Executive Overview {mode === "feature" && focusedFeature ? `— ${focusedFeature.title}` : ""}
+                    </h2>
+                  </div>
+                  {mode === "project" && (
+                    <span className="text-xs text-slate-400 hidden sm:inline">
+                      Click any feature to view dedicated flowchart
+                    </span>
+                  )}
+                </div>
+
+                {/* Table Search & Filter Toolbar (Item 1.1) */}
+                <div className="px-5 py-3 bg-white border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
+                    <div className="relative flex-1 max-w-sm">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       <input
                         type="text"
-                        value={editProjectNameInput}
-                        onChange={(e) => setEditProjectNameInput(e.target.value)}
-                        className="text-lg font-bold text-slate-900 border border-indigo-400 rounded-lg px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                        placeholder="Project name"
-                        autoFocus
+                        value={tableSearch}
+                        onChange={(e) => setTableSearch(e.target.value)}
+                        placeholder="Search features, notes, owners..."
+                        className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-300 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                       />
-                      <button
-                        onClick={handleRenameProject}
-                        className="px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 shadow-2xs"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={() => setIsEditingProjectName(false)}
-                        className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-xs font-semibold hover:bg-slate-200"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <h1 className="text-xl font-bold text-slate-900">
-                        {currentProject.name}
-                      </h1>
-                      {isOwner && (
+                      {tableSearch && (
                         <button
-                          onClick={() => {
-                            setEditProjectNameInput(currentProject.name);
-                            setIsEditingProjectName(true);
-                          }}
-                          className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-slate-100 transition"
-                          title="Rename Project (Owner Only)"
+                          type="button"
+                          onClick={() => setTableSearch("")}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                         >
-                          <Edit2 className="w-3.5 h-3.5" />
+                          <X className="w-3.5 h-3.5" />
                         </button>
                       )}
                     </div>
-                  )}
 
-                  <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200 font-medium">
-                    /{currentProject.slug}
-                  </span>
+                    {/* Stage Filter */}
+                    <div className="relative">
+                      <select
+                        value={stageFilter}
+                        onChange={(e) => setStageFilter(e.target.value)}
+                        className="appearance-none pl-3 pr-8 py-1.5 rounded-lg border border-slate-300 bg-white text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                      >
+                        <option value="all">All Stages</option>
+                        {Array.from({ length: 7 }, (_, i) => (
+                          <option key={i + 1} value={String(i + 1)}>
+                            Stage {i + 1}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
 
-                  {isOwner ? (
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
-                      Owner
-                    </span>
-                  ) : (
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200">
-                      Collaborator
-                    </span>
-                  )}
+                    {/* Owner Filter */}
+                    {uniqueOwners.length > 0 && (
+                      <div className="relative">
+                        <select
+                          value={ownerFilter}
+                          onChange={(e) => setOwnerFilter(e.target.value)}
+                          className="appearance-none pl-3 pr-8 py-1.5 rounded-lg border border-slate-300 bg-white text-xs text-slate-700 font-medium max-w-[180px] truncate focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        >
+                          <option value="all">All Owners</option>
+                          {uniqueOwners.map((owner) => (
+                            <option key={owner} value={owner}>
+                              {owner}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
+                    )}
 
-                  {currentProject.pendingRequestsCount && currentProject.pendingRequestsCount > 0 ? (
-                    <button
-                      onClick={() => {
-                        setShareModalTab("requests");
-                        setShowShareModal(true);
-                      }}
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 animate-pulse hover:bg-rose-100 transition"
-                    >
-                      <UserCheck className="w-3 h-3 text-rose-600" />
-                      <span>
-                        {currentProject.pendingRequestsCount} Request
-                        {currentProject.pendingRequestsCount > 1 ? "s" : ""}
-                      </span>
-                    </button>
-                  ) : null}
+                    {(tableSearch || stageFilter !== "all" || ownerFilter !== "all") && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTableSearch("");
+                          setStageFilter("all");
+                          setOwnerFilter("all");
+                        }}
+                        className="text-xs text-indigo-600 hover:text-indigo-800 font-medium underline"
+                      >
+                        Reset Filters
+                      </button>
+                    )}
+                  </div>
 
-                  {isOwner && (
-                    <button
-                      onClick={() => setShowDeleteProjectConfirm(true)}
-                      className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition ml-1"
-                      title="Delete Project (Owner Only)"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                  <div className="text-[11px] font-mono text-slate-500 shrink-0">
+                    Showing {filteredFeatures.length} of {displayFeatures.length} features
+                  </div>
                 </div>
-                {currentProject.description && (
-                  <p className="text-sm text-slate-500 mt-1">
-                    {currentProject.description}
-                  </p>
+
+                {filteredFeatures.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-slate-500 space-y-2">
+                    <p>No features match your search or filter criteria.</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTableSearch("");
+                        setStageFilter("all");
+                        setOwnerFilter("all");
+                      }}
+                      className="text-xs text-indigo-600 hover:underline font-semibold"
+                    >
+                      Clear search and filters
+                    </button>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-[11px] font-mono uppercase text-slate-600 bg-slate-50 font-semibold select-none">
+                          <th
+                            className="py-2.5 px-4 cursor-pointer hover:text-indigo-600 transition"
+                            onClick={() => {
+                              if (sortBy === "title") {
+                                setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                              } else {
+                                setSortBy("title");
+                                setSortOrder("asc");
+                              }
+                            }}
+                          >
+                            <div className="flex items-center gap-1">
+                              <span>Feature</span>
+                              {sortBy === "title" ? (
+                                sortOrder === "asc" ? <ChevronUp className="w-3 h-3 text-indigo-600" /> : <ChevronDown className="w-3 h-3 text-indigo-600" />
+                              ) : (
+                                <ChevronsUpDown className="w-3 h-3 text-slate-300" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            className="py-2.5 px-4 cursor-pointer hover:text-indigo-600 transition"
+                            onClick={() => {
+                              if (sortBy === "stage") {
+                                setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                              } else {
+                                setSortBy("stage");
+                                setSortOrder("asc");
+                              }
+                            }}
+                          >
+                            <div className="flex items-center gap-1">
+                              <span>Stage</span>
+                              {sortBy === "stage" ? (
+                                sortOrder === "asc" ? <ChevronUp className="w-3 h-3 text-indigo-600" /> : <ChevronDown className="w-3 h-3 text-indigo-600" />
+                              ) : (
+                                <ChevronsUpDown className="w-3 h-3 text-slate-300" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            className="py-2.5 px-4 min-w-[160px] cursor-pointer hover:text-indigo-600 transition"
+                            onClick={() => {
+                              if (sortBy === "owner") {
+                                setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                              } else {
+                                setSortBy("owner");
+                                setSortOrder("asc");
+                              }
+                            }}
+                          >
+                            <div className="flex items-center gap-1">
+                              <span>Current Owner</span>
+                              {sortBy === "owner" ? (
+                                sortOrder === "asc" ? <ChevronUp className="w-3 h-3 text-indigo-600" /> : <ChevronDown className="w-3 h-3 text-indigo-600" />
+                              ) : (
+                                <ChevronsUpDown className="w-3 h-3 text-slate-300" />
+                              )}
+                            </div>
+                          </th>
+                          <th
+                            className="py-2.5 px-4 cursor-pointer hover:text-indigo-600 transition"
+                            onClick={() => {
+                              if (sortBy === "timeline") {
+                                setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                              } else {
+                                setSortBy("timeline");
+                                setSortOrder("asc");
+                              }
+                            }}
+                          >
+                            <div className="flex items-center gap-1">
+                              <span>Timeline</span>
+                              {sortBy === "timeline" ? (
+                                sortOrder === "asc" ? <ChevronUp className="w-3 h-3 text-indigo-600" /> : <ChevronDown className="w-3 h-3 text-indigo-600" />
+                              ) : (
+                                <ChevronsUpDown className="w-3 h-3 text-slate-300" />
+                              )}
+                            </div>
+                          </th>
+                          <th className="py-2.5 px-4">Key Links</th>
+                          <th className="py-2.5 px-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200/80">
+                        {filteredFeatures.map((feat) => (
+                          <tr
+                            key={feat.id}
+                            onClick={() => {
+                              if (mode === "project") {
+                                router.push(`/${effectiveCreatorSlug}/${currentProject.slug}/${feat.slug}`);
+                              } else {
+                                const el = document.getElementById(`feature-card-${feat.id}`);
+                                if (el) {
+                                  el.scrollIntoView({ behavior: "smooth", block: "start" });
+                                }
+                              }
+                            }}
+                            className={`${mode === "project" ? "hover:bg-slate-50/80 cursor-pointer" : ""} transition group`}
+                          >
+                            <td className="py-3 px-4 font-bold text-slate-900">
+                              <div className="group-hover:text-indigo-600 transition-colors">
+                                {feat.title}
+                              </div>
+                              <div className="text-xs text-slate-500 font-normal truncate max-w-xs">
+                                {feat.summary}
+                              </div>
+                            </td>
+                            {/* Neutral Stage Pill with Semantic Progress Dot (Item 1.6) */}
+                            <td className="py-3 px-4">
+                              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold">
+                                <span
+                                  className={`w-2 h-2 rounded-full ${getStageProgressDotClass(
+                                    feat.fourQuestions.where.stageIndex,
+                                    feat.fourQuestions.where.totalStages
+                                  )} shrink-0`}
+                                />
+                                <span className="whitespace-nowrap">{feat.fourQuestions.where.stageName}</span>
+                                <span className="text-slate-500 font-mono text-[11px] whitespace-nowrap">
+                                  ({feat.fourQuestions.where.stageIndex + 1}/
+                                  {feat.fourQuestions.where.totalStages})
+                                </span>
+                              </div>
+                            </td>
+                            {/* Owner Column Sizing & Truncation with Tooltip (Item 1.5) */}
+                            <td className="py-3 px-4 text-xs text-slate-700 font-medium min-w-[160px] max-w-[220px]">
+                              <div
+                                className="line-clamp-2 sm:line-clamp-3 leading-snug cursor-help"
+                                title={feat.fourQuestions.who}
+                              >
+                                {feat.fourQuestions.who}
+                              </div>
+                            </td>
+                            {/* Consolidated Timeline Column (Items 1.2 & 1.4: eliminates horizontal scroll) */}
+                            <td className="py-3 px-4">
+                              <div
+                                className="flex items-center gap-2 whitespace-nowrap cursor-help"
+                                title={`Projected: ${formatDisplayDate(feat.fourQuestions.whenExpectDone)}${
+                                  feat.fourQuestions.whenWantDone
+                                    ? ` • Target Deadline: ${formatDisplayDate(feat.fourQuestions.whenWantDone)}`
+                                    : ""
+                                }`}
+                              >
+                                <span className="font-mono text-xs text-slate-900 font-bold shrink-0">
+                                  {formatDisplayDate(feat.fourQuestions.whenExpectDone)}
+                                </span>
+                                <ScheduleHealthBadge feature={feat} />
+                              </div>
+                              {feat.fourQuestions.whenWantDone && (
+                                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                                  Target: {formatDisplayDate(feat.fourQuestions.whenWantDone)}
+                                </div>
+                              )}
+                            </td>
+                            <td
+                              className="py-3 px-4"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div className="flex flex-wrap gap-1.5">
+                                {dedupLinks(feat.links).slice(0, 2).map((l) => (
+                                  <LinkBadge key={l.id} link={l} />
+                                ))}
+                                {dedupLinks(feat.links).length === 0 && (
+                                  <span className="text-xs text-slate-400">None</span>
+                                )}
+                              </div>
+                            </td>
+                            <td
+                              className="py-3 px-4 text-right"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => openEditor(feat)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-700 shadow-2xs hover:border-slate-400 hover:text-slate-900 transition"
+                                title="Edit feature stage & dates"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                                <span>Edit</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-2 self-start md:self-auto">
-              <button
-                onClick={() => refreshProjects(currentProject.id)}
-                className="p-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 hover:text-indigo-600 transition shadow-2xs"
-                title="Refresh latest AI agent updates"
-              >
-                <RefreshCw
-                  className={`w-4 h-4 ${isLoading ? "animate-spin text-indigo-600" : ""}`}
-                />
-              </button>
-            </div>
-          </div>
-
-        {/* Executive Overview Summary Table */}
-        {currentProject && currentProject.features.length > 0 && (
-          <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
-            <div className="px-5 py-3 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-indigo-600" />
-                <h2 className="text-xs font-mono uppercase tracking-wider text-slate-800 font-bold">
-                  Executive Overview
-                </h2>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 text-[11px] font-mono uppercase text-slate-600 bg-slate-50 font-semibold">
-                    <th className="py-2.5 px-4">Feature</th>
-                    <th className="py-2.5 px-4">Stage</th>
-                    <th className="py-2.5 px-4">Current Owner</th>
-                    <th className="py-2.5 px-4">Target</th>
-                    <th className="py-2.5 px-4">Projected</th>
-                    <th className="py-2.5 px-4">Key Links</th>
-                    <th className="py-2.5 px-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200/80">
-                  {currentProject.features.map((feat) => (
-                    <tr
-                      key={feat.id}
-                      onClick={() => {
-                        const el = document.getElementById(`feature-card-${feat.id}`);
-                        if (el) {
-                          el.scrollIntoView({ behavior: "smooth", block: "start" });
-                        }
-                      }}
-                      className="hover:bg-slate-50/80 cursor-pointer transition group"
-                    >
-                      <td className="py-3 px-4 font-bold text-slate-900">
-                        <div className="group-hover:text-indigo-600 transition-colors">
-                          {feat.title}
-                        </div>
-                        <div className="text-xs text-slate-500 font-normal truncate max-w-xs">
-                          {feat.summary}
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold">
-                          <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0" />
-                          <span className="whitespace-nowrap">{feat.fourQuestions.where.stageName}</span>
-                          <span className="text-slate-500 font-mono text-[11px] whitespace-nowrap">
-                            ({feat.fourQuestions.where.stageIndex + 1}/
-                            {feat.fourQuestions.where.totalStages})
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 text-xs text-slate-700 font-medium">
-                        {feat.fourQuestions.who}
-                      </td>
-                      <td className="py-3 px-4 font-mono text-xs text-slate-600 font-semibold whitespace-nowrap">
-                        {feat.fourQuestions.whenWantDone || "—"}
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2 whitespace-nowrap">
-                          <span className="font-mono text-xs text-slate-900 font-bold shrink-0">
-                            {feat.fourQuestions.whenExpectDone || "—"}
-                          </span>
-                          <ScheduleHealthBadge feature={feat} />
-                        </div>
-                      </td>
-                      <td
-                        className="py-3 px-4"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div className="flex flex-wrap gap-1.5">
-                          {feat.links.slice(0, 2).map((l) => (
-                            <LinkBadge key={l.id} link={l} />
-                          ))}
-                          {feat.links.length === 0 && (
-                            <span className="text-xs text-slate-400">None</span>
-                          )}
-                        </div>
-                      </td>
-                      <td
-                        className="py-3 px-4 text-right"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          onClick={() => openEditor(feat)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-700 shadow-2xs hover:border-indigo-300 hover:text-indigo-600 transition"
-                          title="Edit feature stage & dates"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                          <span>Edit</span>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+            )}
 
         {/* Feature Cards with Flowchart / Gantt Views */}
-        {currentProject.features.length === 0 ? (
+        {displayFeatures.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-10 text-center bg-white border border-slate-200/90 rounded-2xl shadow-xs space-y-3">
             <h3 className="text-base font-bold text-slate-900">
               No feature flows yet
@@ -908,13 +1467,15 @@ export function KeyzorDashboard({
             <p className="text-xs text-slate-500 max-w-sm">
               Add your first feature flowchart to start tracking development lifecycle stages.
             </p>
-            <button
-              onClick={() => setShowNewFeatureModal(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition"
-            >
-              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Add Feature Flow</span>
-            </button>
+            {mode === "project" && (
+              <button
+                onClick={() => setShowNewFeatureModal(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Add Feature Flow</span>
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-6">
@@ -923,10 +1484,10 @@ export function KeyzorDashboard({
               <div className="flex items-center gap-2">
                 <Layers className="w-4 h-4 text-indigo-600" />
                 <h2 className="text-xs font-mono uppercase tracking-wider text-slate-800 font-bold">
-                  Feature Flows &amp; Timelines
+                  {mode === "feature" ? "Feature Flow & Timeline" : "Feature Flows & Timelines"}
                 </h2>
                 <span className="text-xs font-mono text-slate-400">
-                  ({currentProject.features.length} feature{currentProject.features.length === 1 ? "" : "s"})
+                  ({displayFeatures.length} feature{displayFeatures.length === 1 ? "" : "s"})
                 </span>
               </div>
 
@@ -967,48 +1528,44 @@ export function KeyzorDashboard({
               </div>
             </div>
 
-            {currentProject.features.map((feature) => (
+            {displayFeatures.map((feature) => (
             <section
               key={feature.id}
               id={`feature-card-${feature.id}`}
               className="scroll-mt-6 bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition"
             >
-              {/* Feature Title & Quick Links Bar */}
+              {/* Feature Title & Quick Links Bar (Item 2.4: removed slug badge; Item 2.2: right-flushed actions) */}
               <div className="px-5 py-4 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <div className="flex items-center gap-2.5">
-                    <h3 className="text-lg font-bold text-slate-900">
-                      {feature.title}
-                    </h3>
-                    <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200 font-medium">
-                      {feature.slug}
-                    </span>
-                  </div>
+                  <h3 className="text-lg font-bold text-slate-900">
+                    {feature.title}
+                  </h3>
                   {feature.summary && (
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-slate-500 mt-1 max-w-2xl">
                       {feature.summary}
                     </p>
                   )}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  {feature.links.map((lnk) => (
+                <div className="flex flex-wrap items-center gap-2 ml-auto">
+                  {dedupLinks(feature.links).map((lnk) => (
                     <LinkBadge key={lnk.id} link={lnk} />
                   ))}
                   <button
                     onClick={() => openEditor(feature)}
-                    className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-700 shadow-2xs transition"
+                    className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-700 shadow-2xs hover:border-slate-400 hover:text-slate-900 transition"
                   >
                     Update Stage / Links
                   </button>
                 </div>
               </div>
 
-              {/* The 4 Core Questions Strip */}
+              {/* The 4 Core Questions Strip (Item 2.5: consolidated; Item 2.8: advance & return buttons) */}
               <FourQuestionsCardRow
                 feature={feature}
                 onSelectStage={openEditor}
                 onQuickAdvance={handleQuickAdvance}
+                onQuickReturn={handleQuickReturn}
                 onOpenEditModal={openEditor}
               />
 
@@ -2041,6 +2598,12 @@ export function KeyzorDashboard({
                   className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
                 />
               </div>
+              {createProjectError && (
+                <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                  <span>{createProjectError}</span>
+                </div>
+              )}
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"

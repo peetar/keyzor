@@ -4,6 +4,8 @@ import {
   db,
   ensureDatabaseReady,
   reconcileLegacyDefaultUserAssets,
+  DEFAULT_USER_ID,
+  isPlaceholderEmail,
 } from "@/db";
 import * as schema from "@/db/schema";
 import {
@@ -112,6 +114,8 @@ export interface EnrichedProject {
   ownerId: string;
   ownerName?: string;
   ownerEmail?: string;
+  ownerUsername?: string;
+  creatorSlug?: string;
   userRole?: "owner" | "editor" | null;
   slug: string;
   name: string;
@@ -252,24 +256,158 @@ export async function listProjects(forUserId?: string): Promise<EnrichedProject[
   return results;
 }
 
+export function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 48);
+}
+
+export function getUserCreatorSlug(user: {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  username?: string | null;
+}): string {
+  if (user.username && user.username.trim()) {
+    return slugify(user.username);
+  }
+  if (user.id === DEFAULT_USER_ID) {
+    return "petertrice";
+  }
+  if (user.name && user.name.trim()) {
+    const s = slugify(user.name);
+    if (s && !s.includes("architect")) return s;
+  }
+  if (user.email) {
+    const prefix = user.email.split("@")[0];
+    if (prefix && !isPlaceholderEmail(user.email)) {
+      return slugify(prefix);
+    }
+  }
+  return slugify(user.id);
+}
+
+export async function findUserByCreatorSlug(
+  creatorSlug: string
+): Promise<typeof schema.users.$inferSelect | null> {
+  await ensureDatabaseReady();
+  const normalized = creatorSlug.trim().toLowerCase();
+
+  // 1. Direct username column match
+  const byUsername = await db
+    .select()
+    .from(schema.users)
+    .where(sql`LOWER(${schema.users.username}) = ${normalized}`);
+  if (byUsername.length > 0) return byUsername[0];
+
+  // 2. Direct ID match
+  const byId = await db
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.id, creatorSlug));
+  if (byId.length > 0) return byId[0];
+
+  // 3. Fallback: match all users by computed creatorSlug
+  const allUsers = await db.select().from(schema.users);
+  for (const u of allUsers) {
+    if (getUserCreatorSlug(u).toLowerCase() === normalized) {
+      return u;
+    }
+  }
+
+  // 4. Special fallback for "petertrice"
+  if (normalized === "petertrice") {
+    const defaultUser = allUsers.find(
+      (u) =>
+        u.id === DEFAULT_USER_ID ||
+        u.email.toLowerCase().includes("peter") ||
+        u.name.toLowerCase().includes("peter")
+    );
+    if (defaultUser) return defaultUser;
+    if (allUsers.length > 0) return allUsers[0];
+  }
+
+  return null;
+}
+
+export async function getProjectByCreatorAndSlug(
+  creatorSlug: string,
+  projectSlug: string,
+  forUserId?: string
+): Promise<EnrichedProject | null> {
+  await ensureDatabaseReady();
+  const creator = await findUserByCreatorSlug(creatorSlug);
+  if (!creator) return null;
+
+  const rows = await db
+    .select()
+    .from(schema.projects)
+    .where(
+      and(
+        eq(schema.projects.ownerId, creator.id),
+        eq(schema.projects.slug, projectSlug)
+      )
+    );
+
+  let project = rows[0];
+
+  if (!project) {
+    const caseMatch = await db
+      .select()
+      .from(schema.projects)
+      .where(
+        and(
+          eq(schema.projects.ownerId, creator.id),
+          sql`LOWER(${schema.projects.slug}) = ${projectSlug.toLowerCase()}`
+        )
+      );
+    project = caseMatch[0];
+  }
+
+  if (!project) return null;
+
+  return getProjectByIdOrSlug(project.id, forUserId);
+}
+
 export async function getProjectByIdOrSlug(
   idOrSlug: string,
   forUserId?: string
 ): Promise<EnrichedProject | null> {
   await ensureDatabaseReady();
-  const rows = await db
-    .select()
-    .from(schema.projects)
-    .where(eq(schema.projects.slug, idOrSlug));
+  let project: typeof schema.projects.$inferSelect | undefined;
 
-  const project =
-    rows[0] ??
-    (
-      await db
-        .select()
-        .from(schema.projects)
-        .where(eq(schema.projects.id, idOrSlug))
-    )[0];
+  if (forUserId) {
+    const userOwned = await db
+      .select()
+      .from(schema.projects)
+      .where(
+        and(
+          eq(schema.projects.ownerId, forUserId),
+          eq(schema.projects.slug, idOrSlug)
+        )
+      );
+    if (userOwned.length > 0) {
+      project = userOwned[0];
+    }
+  }
+
+  if (!project) {
+    const rows = await db
+      .select()
+      .from(schema.projects)
+      .where(eq(schema.projects.slug, idOrSlug));
+
+    project =
+      rows[0] ??
+      (
+        await db
+          .select()
+          .from(schema.projects)
+          .where(eq(schema.projects.id, idOrSlug))
+      )[0];
+  }
 
   if (!project) return null;
 
@@ -420,11 +558,15 @@ export async function getProjectByIdOrSlug(
     }));
   }
 
+  const creatorSlug = owner ? getUserCreatorSlug(owner) : "creator";
+
   return {
     id: project.id,
     ownerId: project.ownerId,
     ownerName: owner?.name || "Project Owner",
     ownerEmail: owner?.email || "",
+    ownerUsername: owner?.username || creatorSlug,
+    creatorSlug,
     userRole,
     slug: project.slug,
     name: project.name,
@@ -538,11 +680,32 @@ export async function getFeatureByIdOrSlug(
     .where(eq(schema.featureStages.featureId, feature.id))
     .orderBy(asc(schema.featureStages.sortOrder));
 
-  const links = await db
+  const rawLinks = await db
     .select()
     .from(schema.stageLinks)
     .where(eq(schema.stageLinks.featureId, feature.id))
     .orderBy(asc(schema.stageLinks.createdAt));
+
+  // Deduplicate links by URL (keeping the latest updated link for each URL)
+  const linkMap = new Map<string, typeof rawLinks[number]>();
+  for (const l of rawLinks) {
+    const normKey = normalizeUrl(l.url || "").toLowerCase();
+    if (!normKey) continue;
+    linkMap.set(normKey, l);
+  }
+  const links = Array.from(linkMap.values());
+  const keptIds = new Set(links.map((l) => l.id));
+  const duplicateIdsToDelete = rawLinks
+    .filter((l) => !keptIds.has(l.id))
+    .map((l) => l.id);
+
+  if (duplicateIdsToDelete.length > 0) {
+    db.delete(schema.stageLinks)
+      .where(inArray(schema.stageLinks.id, duplicateIdsToDelete))
+      .catch((err) =>
+        console.error("Failed to prune duplicate stageLinks:", err)
+      );
+  }
 
   const enrichedStages: EnrichedStage[] = stages.map((s) => ({
     id: s.id,
@@ -597,14 +760,6 @@ export async function getFeatureByIdOrSlug(
   };
 }
 
-function slugify(input: string): string {
-  return input
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
-    .slice(0, 48);
-}
-
 export async function createProject(input: {
   name: string;
   description?: string;
@@ -615,17 +770,36 @@ export async function createProject(input: {
   ownerId?: string;
 }): Promise<EnrichedProject> {
   await ensureDatabaseReady();
-  const id = `proj_${crypto.randomBytes(5).toString("hex")}`;
-  const baseSlug = slugify(input.slug || input.name || "project");
-  const existing = await getProjectByIdOrSlug(baseSlug);
-  const slug = existing
-    ? `${baseSlug}-${crypto.randomBytes(2).toString("hex")}`
-    : baseSlug;
-
   if (!input.ownerId) {
     throw new Error("Field 'ownerId' is required to create a project.");
   }
   const ownerId = input.ownerId;
+  const trimmedName = input.name.trim();
+  if (!trimmedName) {
+    throw new Error("Project name cannot be empty.");
+  }
+
+  const baseSlug = slugify(input.slug || trimmedName || "project");
+
+  // Enforce unique project names by creator (ownerId)
+  const existingForOwner = await db
+    .select()
+    .from(schema.projects)
+    .where(
+      and(
+        eq(schema.projects.ownerId, ownerId),
+        sql`(LOWER(${schema.projects.name}) = LOWER(${trimmedName}) OR ${schema.projects.slug} = ${baseSlug})`
+      )
+    );
+
+  if (existingForOwner.length > 0) {
+    throw new Error(
+      `A project with name '${trimmedName}' already exists in your workspace.`
+    );
+  }
+
+  const id = `proj_${crypto.randomBytes(5).toString("hex")}`;
+  const slug = baseSlug;
 
   await db.insert(schema.projects).values({
     id,
@@ -688,6 +862,7 @@ export interface CreateFeatureInput {
     proactiveTrigger?: string;
   }>;
   links?: Array<{
+    stageId?: string;
     label: string;
     url: string;
     linkType?: string;
@@ -812,14 +987,21 @@ export async function createFeatureWithFlow(
   }
 
   if (input.links && input.links.length > 0) {
+    const seenUrls = new Set<string>();
     for (const l of input.links) {
+      if (!l.url || !l.url.trim()) continue;
+      const cleanUrl = l.url.trim();
+      const normKey = normalizeUrl(cleanUrl).toLowerCase();
+      if (seenUrls.has(normKey)) continue;
+      seenUrls.add(normKey);
+
       await db.insert(schema.stageLinks).values({
         id: `lnk_${crypto.randomBytes(5).toString("hex")}`,
         featureId,
-        stageId: currentStageId,
+        stageId: l.stageId || currentStageId,
         label: l.label,
-        url: l.url,
-        linkType: l.linkType || inferLinkType(l.url, l.label),
+        url: cleanUrl,
+        linkType: l.linkType || inferLinkType(cleanUrl, l.label),
         createdBy: input.actorName || "Coding Agent",
       });
     }
@@ -842,6 +1024,17 @@ export async function createFeatureWithFlow(
   const enriched = await getFeatureByIdOrSlug(featureId);
   if (!enriched) throw new Error("Failed to load created feature");
   return enriched;
+}
+
+export function normalizeUrl(url: string): string {
+  return (url || "").trim().replace(/\/+$/, "");
+}
+
+export function areUrlsEquivalent(urlA: string, urlB: string): boolean {
+  const normA = normalizeUrl(urlA);
+  const normB = normalizeUrl(urlB);
+  if (normA === normB) return true;
+  return normA.toLowerCase() === normB.toLowerCase();
 }
 
 function inferLinkType(url: string, label: string): string {
@@ -869,7 +1062,7 @@ function inferLinkType(url: string, label: string): string {
 export interface UpdateFeatureStatusInput {
   featureIdOrSlug: string;
   // Transition control
-  action?: "advance" | "set_stage" | "complete_feature" | "reopen";
+  action?: "advance" | "revert" | "previous" | "set_stage" | "complete_feature" | "reopen";
   stageId?: string;
   stageName?: string;
   // The 4 Core Questions updates
@@ -917,6 +1110,11 @@ export async function updateFeatureStatus(
     const nextIdx = Math.min(currentIdx + 1, stages.length - 1);
     targetStage = stages[nextIdx];
     actionSummaryParts.push(`Advanced to '${targetStage.name}'`);
+  } else if (input.action === "revert" || input.action === "previous") {
+    const currentIdx = stages.findIndex((s) => s.id === targetStage?.id);
+    const prevIdx = Math.max(0, currentIdx - 1);
+    targetStage = stages[prevIdx];
+    actionSummaryParts.push(`Returned to previous stage '${targetStage.name}'`);
   } else if (input.stageId || input.stageName) {
     const matched = stages.find(
       (s) =>
@@ -942,6 +1140,8 @@ export async function updateFeatureStatus(
   // If transitioning stage or completing feature, update stage statuses & actual dates for Gantt
   if (
     input.action === "advance" ||
+    input.action === "revert" ||
+    input.action === "previous" ||
     input.action === "set_stage" ||
     input.stageId ||
     input.stageName ||
@@ -1041,17 +1241,52 @@ export async function updateFeatureStatus(
     .where(eq(schema.features.id, feature.id));
 
   if (input.links && input.links.length > 0) {
+    const existingLinks = await db
+      .select()
+      .from(schema.stageLinks)
+      .where(eq(schema.stageLinks.featureId, feature.id));
+
+    const seenUrls = new Set<string>();
+
     for (const l of input.links) {
-      await db.insert(schema.stageLinks).values({
-        id: `lnk_${crypto.randomBytes(5).toString("hex")}`,
-        featureId: feature.id,
-        stageId: l.stageId || targetStage?.id || feature.currentStageId,
-        label: l.label,
-        url: l.url,
-        linkType: l.linkType || inferLinkType(l.url, l.label),
-        createdBy: input.actorName || "Coding Agent",
-      });
-      actionSummaryParts.push(`Attached link '${l.label}'`);
+      if (!l.url || !l.url.trim()) continue;
+      const cleanUrl = l.url.trim();
+      const normKey = normalizeUrl(cleanUrl).toLowerCase();
+
+      // Avoid duplicates within the input.links payload itself
+      if (seenUrls.has(normKey)) continue;
+      seenUrls.add(normKey);
+
+      const existingMatch = existingLinks.find((ex) =>
+        areUrlsEquivalent(ex.url, cleanUrl)
+      );
+
+      if (existingMatch) {
+        // Update existing link instead of inserting duplicate
+        await db
+          .update(schema.stageLinks)
+          .set({
+            stageId: l.stageId || targetStage?.id || existingMatch.stageId,
+            label: l.label || existingMatch.label,
+            linkType:
+              l.linkType ||
+              existingMatch.linkType ||
+              inferLinkType(cleanUrl, l.label || existingMatch.label),
+            createdBy: input.actorName || existingMatch.createdBy,
+          })
+          .where(eq(schema.stageLinks.id, existingMatch.id));
+      } else {
+        await db.insert(schema.stageLinks).values({
+          id: `lnk_${crypto.randomBytes(5).toString("hex")}`,
+          featureId: feature.id,
+          stageId: l.stageId || targetStage?.id || feature.currentStageId,
+          label: l.label,
+          url: cleanUrl,
+          linkType: l.linkType || inferLinkType(cleanUrl, l.label),
+          createdBy: input.actorName || "Coding Agent",
+        });
+        actionSummaryParts.push(`Attached link '${l.label}'`);
+      }
     }
   }
 
@@ -1177,12 +1412,14 @@ export async function authenticateAgentRequest(
 export async function getOrCreateUser(input: {
   email: string;
   name?: string | null;
+  username?: string | null;
   image?: string | null;
   provider?: string;
 }): Promise<{
   id: string;
   email: string;
   name: string;
+  username: string | null;
   image: string | null;
   provider: string;
 }> {
@@ -1198,25 +1435,43 @@ export async function getOrCreateUser(input: {
     id: string;
     email: string;
     name: string;
+    username: string | null;
     image: string | null;
     provider: string;
   };
 
   if (existing.length > 0) {
     user = existing[0];
+    const updates: Partial<typeof schema.users.$inferInsert> = {};
     if (input.name && input.name !== user.name) {
+      updates.name = input.name;
+      user.name = input.name;
+    }
+    if (input.image && input.image !== user.image) {
+      updates.image = input.image;
+      user.image = input.image;
+    }
+    if (input.username && !user.username) {
+      const u = slugify(input.username);
+      updates.username = u;
+      user.username = u;
+    }
+    if (Object.keys(updates).length > 0) {
       await db
         .update(schema.users)
-        .set({ name: input.name, image: input.image ?? user.image })
+        .set(updates)
         .where(eq(schema.users.id, user.id));
-      user.name = input.name;
     }
   } else {
     const id = `usr_${crypto.randomBytes(6).toString("hex")}`;
+    const username = input.username
+      ? slugify(input.username)
+      : slugify(input.name || input.email.split("@")[0]);
     user = {
       id,
       email: normalizedEmail,
       name: input.name?.trim() || "Software Architect",
+      username,
       image: input.image ?? null,
       provider: input.provider || "oauth",
     };
@@ -1671,9 +1926,27 @@ export async function renameProject(
   const trimmed = newName.trim();
   if (!trimmed) throw new Error("Project name cannot be empty.");
 
+  const newSlug = slugify(trimmed);
+
+  // Enforce unique project name by creator
+  const duplicate = await db
+    .select()
+    .from(schema.projects)
+    .where(
+      and(
+        eq(schema.projects.ownerId, perm.project.ownerId),
+        sql`(LOWER(${schema.projects.name}) = LOWER(${trimmed}) OR ${schema.projects.slug} = ${newSlug})`,
+        sql`${schema.projects.id} != ${perm.project.id}`
+      )
+    );
+
+  if (duplicate.length > 0) {
+    throw new Error(`A project named '${trimmed}' already exists in your workspace.`);
+  }
+
   await db
     .update(schema.projects)
-    .set({ name: trimmed, updatedAt: new Date() })
+    .set({ name: trimmed, slug: newSlug, updatedAt: new Date() })
     .where(eq(schema.projects.id, perm.project.id));
 
   await db.insert(schema.activityLogs).values({
@@ -1682,7 +1955,7 @@ export async function renameProject(
     actorType: "human",
     actorName: "Project Owner",
     action: "Renamed Project",
-    details: `Renamed project to '${trimmed}'.`,
+    details: `Renamed project to '${trimmed}' (${newSlug}).`,
   });
 
   const updated = await getProjectByIdOrSlug(perm.project.id, userId);

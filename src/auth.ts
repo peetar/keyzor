@@ -61,6 +61,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           ? profileAny.avatar_url
           : undefined);
 
+      const resolvedUsername =
+        (typeof profileAny?.login === "string" ? profileAny.login : undefined) ||
+        (resolvedEmail ? resolvedEmail.split("@")[0] : undefined);
+
       const needsSync =
         Boolean(user) ||
         !token.userId ||
@@ -72,12 +76,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           const dbUser = await getOrCreateUser({
             email: resolvedEmail,
             name: resolvedName,
+            username: resolvedUsername,
             image: resolvedImage,
             provider: account?.provider || "github",
           });
           token.userId = dbUser.id;
           token.email = dbUser.email;
           token.name = dbUser.name;
+          token.username = dbUser.username;
           token.migratedV4 = true;
         } catch (e) {
           console.error("Error syncing user in auth jwt callback:", e);
@@ -101,6 +107,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             const dbUser = await getOrCreateUser({
               email,
               name: session.user.name || (token?.name as string) || undefined,
+              username: (token?.username as string) || undefined,
               image: session.user.image || (token?.picture as string) || undefined,
               provider: "github",
             });

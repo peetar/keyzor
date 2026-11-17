@@ -269,8 +269,8 @@ Welcome, Coding Agent! You have connected to **KEYZOR** (\`${baseUrl}\`), an AI-
 KEYZOR is intentionally **not** a bloated ticket tracker. It exists to answer **4 Core Questions** for every feature at a glance:
 1. **Where is this feature?** (Current stage in the Flowchart / Gantt timeline)
 2. **Who is working on it?** (\`currentOwner\` — e.g. \`"CPO"\`, \`"Lead Architect"\`, \`"India Dev Team"\`, \`"Antigravity Agent"\`)
-3. **When do we want it done?** (\`targetDate\` in \`YYYY-MM-DD\`)
-4. **When do we expect it to be done?** (\`expectedDate\` in \`YYYY-MM-DD\`)
+3. **When do we want it done?** (\`targetDate\` — e.g. \`YYYY-MM-DD\`, or flexible/fuzzy e.g. \`"Q1 2027"\`, \`"TBD"\`, or optional/omitted if timeline is fluid)
+4. **When do we expect it to be done?** (\`expectedDate\` — e.g. \`YYYY-MM-DD\`, or flexible/fuzzy e.g. \`"Mid Dec"\`, \`"TBD"\`, or optional/omitted)
 
 ### YOUR PROACTIVE BEHAVIOR RULES (MANDATORY OPERATIONAL PROTOCOL)
 
@@ -406,6 +406,7 @@ curl -X POST "${baseUrl}/api/v1/projects/<projectSlug>/features/batch" \\
 ### D. Advance Stage, Update the 4 Questions, or Attach Links (design.md, GitHub PR, Trello, Preview URL)
 Use \`PATCH /api/v1/features/<featureIdOrSlug>/status\` (or alias \`PATCH /api/v1/features/<featureIdOrSlug>\`) for all updates:
 - Set \`"action": "advance"\` to move to the next stage in the flowchart.
+- Set \`"action": "return"\` (or \`"previous"\`) to step back to the previous stage if a task was accidentally advanced or needs rework.
 - Or set \`"stageName": "Handed Over to Dev"\` to jump to a specific stage by name.
 - Or omit \`"action"\`/\`"stageName"\` to simply update \`currentOwner\`, \`targetDate\`, \`expectedDate\`, \`notes\`, or attach \`links\`.
 

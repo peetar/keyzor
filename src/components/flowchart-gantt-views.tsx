@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import type {
   EnrichedFeature,
   EnrichedStage,
@@ -19,8 +19,68 @@ import {
   Calendar,
   AlertTriangle,
   ArrowRight,
+  ArrowLeft,
   Sparkles,
 } from "lucide-react";
+
+export function formatDisplayDate(dateStr?: string | null): string {
+  if (!dateStr || !dateStr.trim()) return "—";
+  const trimmed = dateStr.trim();
+  const isoMatch = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (isoMatch) {
+    const year = parseInt(isoMatch[1], 10);
+    const month = parseInt(isoMatch[2], 10) - 1;
+    const day = parseInt(isoMatch[3], 10);
+    const d = new Date(year, month, day);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+  }
+  return trimmed;
+}
+
+export function formatShortDate(dateStr?: string | null): string {
+  if (!dateStr || !dateStr.trim()) return "—";
+  const trimmed = dateStr.trim();
+  const isoMatch = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (isoMatch) {
+    const year = parseInt(isoMatch[1], 10);
+    const month = parseInt(isoMatch[2], 10) - 1;
+    const day = parseInt(isoMatch[3], 10);
+    const d = new Date(year, month, day);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+    }
+  }
+  return trimmed;
+}
+
+export function getStageProgressDotClass(stageIndex: number, totalStages: number): string {
+  if (totalStages <= 1) return "bg-emerald-500";
+  const ratio = stageIndex / Math.max(1, totalStages - 1);
+  if (ratio <= 0) return "bg-slate-400";
+  if (ratio <= 0.35) return "bg-sky-500";
+  if (ratio <= 0.7) return "bg-purple-600";
+  if (ratio < 1) return "bg-amber-500";
+  return "bg-emerald-500";
+}
+
+function dedupLinks<T extends { url: string }>(links: T[]): T[] {
+  const seen = new Set<string>();
+  return links.filter((l) => {
+    const key = (l.url || "").trim().toLowerCase().replace(/\/+$/, "");
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 export function LinkBadge({
   link,
@@ -98,100 +158,146 @@ export function FourQuestionsCardRow({
   readOnly,
   onSelectStage,
   onQuickAdvance,
+  onQuickReturn,
   onOpenEditModal,
 }: {
   feature: EnrichedFeature;
   readOnly?: boolean;
   onSelectStage?: (feature: EnrichedFeature, stage: EnrichedStage) => void;
   onQuickAdvance?: (feature: EnrichedFeature) => void;
+  onQuickReturn?: (feature: EnrichedFeature) => void;
   onOpenEditModal?: (feature: EnrichedFeature) => void;
 }) {
   const q = feature.fourQuestions;
+  const dotColor = getStageProgressDotClass(q.where.stageIndex, q.where.totalStages);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4 bg-slate-50/70 border-b border-slate-200/80">
-      {/* STAGE */}
-      <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-xs flex flex-col justify-between">
-        <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-1">
-          <span>Stage</span>
-          <span className="text-indigo-600 font-semibold">
-            {q.where.stageIndex + 1}/{q.where.totalStages} ({q.where.percentComplete}%)
-          </span>
-        </div>
-        <div className="flex items-center justify-between gap-2 mt-1">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse shrink-0" />
+    <div className="p-4 bg-slate-50/70 border-b border-slate-200/80">
+      {/* Consolidated Single Metadata Strip (Item 2.5) */}
+      <div className="bg-white border border-slate-200/90 rounded-xl shadow-xs overflow-hidden divide-y lg:divide-y-0 lg:divide-x divide-slate-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        {/* STAGE */}
+        <div className="p-3.5 flex flex-col justify-between">
+          <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-1">
+            <span>Stage</span>
+            <span className="text-indigo-600 font-semibold">
+              {q.where.stageIndex + 1}/{q.where.totalStages} ({q.where.percentComplete}%)
+            </span>
+          </div>
+          <div className="flex items-center gap-2 mt-1 min-w-0">
+            <span className={`w-2.5 h-2.5 rounded-full ${dotColor} shrink-0`} />
             <span className="text-sm font-bold text-slate-900 truncate">
               {q.where.stageName}
             </span>
           </div>
-          {!readOnly && onQuickAdvance && q.where.stageIndex + 1 < q.where.totalStages && (
-            <button
-              onClick={() => onQuickAdvance(feature)}
-              className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-xs font-semibold inline-flex items-center gap-1 shrink-0 transition shadow-2xs"
-              title="Advance to next stage in 1 click"
-            >
-              Advance <ArrowRight className="w-3 h-3" />
-            </button>
+          {!readOnly && (onQuickAdvance || onQuickReturn) && (
+            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-100 flex-wrap">
+              {onQuickReturn && q.where.stageIndex > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onQuickReturn(feature)}
+                  className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold inline-flex items-center gap-1 shrink-0 transition shadow-2xs hover:border-slate-400 hover:text-slate-900"
+                  title="Return to previous stage"
+                >
+                  <ArrowLeft className="w-3 h-3" />
+                  <span>Return to previous stage</span>
+                </button>
+              )}
+              {onQuickAdvance && q.where.stageIndex + 1 < q.where.totalStages && (
+                <button
+                  type="button"
+                  onClick={() => onQuickAdvance(feature)}
+                  className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold inline-flex items-center gap-1 shrink-0 transition shadow-2xs hover:border-slate-400 hover:text-slate-900"
+                  title="Advance to next stage"
+                >
+                  <span>Advance to next stage</span>
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+              )}
+            </div>
           )}
         </div>
-      </div>
 
-      {/* CURRENT OWNER */}
-      <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-xs flex flex-col justify-between">
-        <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-1">
-          <span>Current Owner</span>
-          <User className="w-3.5 h-3.5 text-purple-600" />
+        {/* CURRENT OWNER */}
+        <div className="p-3.5 flex flex-col justify-between">
+          <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-1">
+            <span>Current Owner</span>
+            <User className="w-3.5 h-3.5 text-purple-600" />
+          </div>
+          <div className="flex items-center justify-between gap-2 mt-1">
+            <span className="text-sm font-semibold text-slate-800 truncate" title={q.who}>
+              {q.who}
+            </span>
+            {!readOnly && onOpenEditModal && (
+              <button
+                type="button"
+                onClick={() => onOpenEditModal(feature)}
+                className="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium underline shrink-0"
+              >
+                Edit
+              </button>
+            )}
+          </div>
         </div>
-        <div className="flex items-center justify-between gap-2 mt-1">
-          <span className="text-sm font-semibold text-slate-800 truncate">
-            {q.who}
-          </span>
-          {!readOnly && onOpenEditModal && (
-            <button
-              onClick={() => onOpenEditModal(feature)}
-              className="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium underline shrink-0"
-            >
-              Edit
-            </button>
-          )}
-        </div>
-      </div>
 
-      {/* TARGET */}
-      <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-xs flex flex-col justify-between">
-        <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-1">
-          <span>Target</span>
-          <Calendar className="w-3.5 h-3.5 text-slate-400" />
+        {/* TARGET */}
+        <div className="p-3.5 flex flex-col justify-between">
+          <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-1">
+            <span>Target</span>
+            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+          </div>
+          <div className="flex items-center justify-between gap-2 mt-1">
+            <span className="text-sm font-mono font-bold text-slate-900">
+              {formatDisplayDate(q.whenWantDone)}
+            </span>
+            <span className="text-[11px] text-slate-500 font-medium">Target Deadline</span>
+          </div>
         </div>
-        <div className="flex items-center justify-between gap-2 mt-1">
-          <span className="text-sm font-mono font-bold text-slate-900">
-            {q.whenWantDone || "Not set"}
-          </span>
-          <span className="text-[11px] text-slate-500 font-medium">Target Deadline</span>
-        </div>
-      </div>
 
-      {/* PROJECTED */}
-      <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-xs flex flex-col justify-between">
-        <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-1">
-          <span>Projected</span>
-          <ScheduleHealthBadge feature={feature} />
-        </div>
-        <div className="flex items-center justify-between gap-2 mt-1">
-          <span className="text-sm font-mono font-bold text-slate-900">
-            {q.whenExpectDone || "Not set"}
-          </span>
-          {!readOnly && onOpenEditModal && (
-            <button
-              onClick={() => onOpenEditModal(feature)}
-              className="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium underline shrink-0"
-            >
-              Update Date
-            </button>
-          )}
+        {/* PROJECTED */}
+        <div className="p-3.5 flex flex-col justify-between">
+          <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-1">
+            <span>Projected</span>
+            <ScheduleHealthBadge feature={feature} />
+          </div>
+          <div className="flex items-center justify-between gap-2 mt-1">
+            <span className="text-sm font-mono font-bold text-slate-900">
+              {formatDisplayDate(q.whenExpectDone)}
+            </span>
+            {!readOnly && onOpenEditModal && (
+              <button
+                type="button"
+                onClick={() => onOpenEditModal(feature)}
+                className="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium underline shrink-0"
+              >
+                Update Date
+              </button>
+            )}
+          </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function StageNotes({ notes }: { notes: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = notes.length > 90;
+
+  return (
+    <div className="text-xs text-slate-600 mb-2 leading-relaxed">
+      <p className={!expanded && isLong ? "line-clamp-3" : ""}>{notes}</p>
+      {isLong && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setExpanded(!expanded);
+          }}
+          className="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium underline mt-0.5 inline-block"
+        >
+          {expanded ? "See Less" : "See More"}
+        </button>
+      )}
     </div>
   );
 }
@@ -258,15 +364,11 @@ export function FeatureFlowchartView({
                     </span>
                   </div>
 
-                  {stage.notes && (
-                    <p className="text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-md p-2 mb-2 line-clamp-3">
-                      {stage.notes}
-                    </p>
-                  )}
+                  {stage.notes && <StageNotes notes={stage.notes} />}
 
-                  {stage.links.length > 0 && (
+                  {dedupLinks(stage.links).length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-2">
-                      {stage.links.map((lnk) => (
+                      {dedupLinks(stage.links).map((lnk) => (
                         <div
                           key={lnk.id}
                           onClick={(e) => e.stopPropagation()}
@@ -278,13 +380,14 @@ export function FeatureFlowchartView({
                   )}
                 </div>
 
-                <div className="mt-3 pt-2.5 border-t border-slate-200/80 flex items-center justify-between text-[11px] font-mono text-slate-500">
+                <div className="mt-3 pt-2.5 border-t border-slate-200/80 flex items-center justify-center gap-1.5 text-[11px] font-mono text-slate-500">
+                  <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
                   <span>
-                    {stage.actualStartDate || stage.plannedStartDate || "—"}
+                    {formatShortDate(stage.actualStartDate || stage.plannedStartDate)}
                   </span>
                   <span>→</span>
                   <span>
-                    {stage.actualEndDate || stage.plannedEndDate || "—"}
+                    {formatShortDate(stage.actualEndDate || stage.plannedEndDate)}
                   </span>
                 </div>
               </div>
@@ -326,6 +429,7 @@ export function FeatureGanttView({
   readOnly?: boolean;
   onSelectStage?: (feature: EnrichedFeature, stage: EnrichedStage) => void;
 }) {
+  const [zoom, setZoom] = useState<"day" | "week" | "month">("week");
   const DAY_MS = 1000 * 60 * 60 * 24;
   const todayIso = new Date().toISOString().slice(0, 10);
   const todayMs = parseDateMs(todayIso, Date.now());
@@ -366,47 +470,73 @@ export function FeatureGanttView({
     ? toPercent(parseDateMs(feature.expectedDate, todayMs))
     : null;
 
-  // Generate tick labels every ~4 days
+  // Generate tick labels based on zoom
   const ticks: Array<{ label: string; pct: number }> = [];
-  const stepDays = Math.max(2, Math.round(totalDays / 8));
+  const stepDays =
+    zoom === "day"
+      ? 1
+      : zoom === "month"
+      ? Math.max(14, Math.round(totalDays / 6))
+      : Math.max(3, Math.round(totalDays / 8));
+
   for (let d = 0; d <= totalDays; d += stepDays) {
     const tickMs = minMs + d * DAY_MS;
-    const iso = new Date(tickMs).toISOString().slice(5, 10); // MM-DD
-    ticks.push({ label: iso, pct: toPercent(tickMs) });
+    const iso = new Date(tickMs).toISOString().slice(0, 10);
+    ticks.push({ label: formatShortDate(iso), pct: toPercent(tickMs) });
   }
 
   return (
     <div className="p-5 bg-white">
-      {/* Legend & Key Date Markers */}
+      {/* Legend, Timeline Markers & Zoom Controls (Items 3.1 & 3.6) */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4 text-xs">
         <div className="flex flex-wrap items-center gap-4 text-slate-600 font-medium">
           <span className="inline-flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-sm bg-emerald-500 inline-block shadow-2xs" />
-            Completed Stage
+            Done
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-sm bg-indigo-600 inline-block shadow-2xs" />
-            Active Stage ("Where")
+            Active Now
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-sm bg-slate-200 border border-slate-300 inline-block" />
-            Planned / Upcoming
+            Pending
           </span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4 font-mono text-[11px] font-semibold">
-          {feature.targetDate && (
-            <span className="inline-flex items-center gap-1.5 text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
-              <span className="w-2 h-3 bg-purple-600 inline-block rounded-sm" />
-              Want Done: {feature.targetDate}
-            </span>
-          )}
-          {feature.expectedDate && (
-            <span className="inline-flex items-center gap-1.5 text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-              <span className="w-2 h-3 bg-amber-500 inline-block rounded-sm" />
-              Expect Done: {feature.expectedDate}
-            </span>
-          )}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Zoom Controls */}
+          <div className="inline-flex rounded-lg bg-slate-100 p-0.5 border border-slate-200 text-xs font-medium">
+            {(["day", "week", "month"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setZoom(mode)}
+                className={`px-2.5 py-0.5 rounded-md capitalize transition text-[11px] ${
+                  zoom === mode
+                    ? "bg-white text-slate-900 font-semibold shadow-2xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] font-semibold">
+            {feature.targetDate && (
+              <span className="inline-flex items-center gap-1.5 text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                <span className="w-2 h-3 bg-purple-600 inline-block rounded-sm" />
+                Target: {formatDisplayDate(feature.targetDate)}
+              </span>
+            )}
+            {feature.expectedDate && (
+              <span className="inline-flex items-center gap-1.5 text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                <span className="w-2 h-3 bg-amber-500 inline-block rounded-sm" />
+                Projected: {formatDisplayDate(feature.expectedDate)}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -422,7 +552,7 @@ export function FeatureGanttView({
               <div
                 key={i}
                 style={{ left: `${t.pct}%` }}
-                className="absolute top-0 bottom-0 border-l border-slate-200 pl-1.5 pt-2 text-[10px] text-slate-500 font-medium select-none"
+                className="absolute top-0 bottom-0 border-l border-slate-200 pl-1 pt-2 text-[10px] text-slate-500 font-medium select-none truncate"
               >
                 {t.label}
               </div>
@@ -455,6 +585,7 @@ export function FeatureGanttView({
               parseDateMs(endIso, startMs + 3 * DAY_MS)
             );
 
+            const durationDays = Math.max(1, Math.round((endMs - startMs) / DAY_MS));
             const leftPct = toPercent(startMs);
             const widthPct = Math.max(3, toPercent(endMs) - leftPct);
 
@@ -466,6 +597,7 @@ export function FeatureGanttView({
                   !readOnly ? "hover:bg-slate-50/80 cursor-pointer" : ""
                 } ${isCurrent ? "bg-indigo-50/40" : ""}`}
               >
+                {/* Flushed Left Typography (Item 3.4) */}
                 <div className="col-span-4 sm:col-span-3 px-4 py-3 border-r border-slate-200 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-mono text-slate-400 font-medium">
@@ -483,7 +615,10 @@ export function FeatureGanttView({
                       {stage.name}
                     </span>
                   </div>
-                  <div className="text-[11px] text-slate-500 truncate pl-4 mt-0.5">
+                  <div
+                    className="text-[11px] text-slate-500 truncate mt-0.5"
+                    title={stage.owner || feature.currentOwner}
+                  >
                     {stage.owner || feature.currentOwner}
                   </div>
                 </div>
@@ -498,49 +633,57 @@ export function FeatureGanttView({
                     />
                   ))}
 
-                  {/* Today Line */}
+                  {/* Today Line with Badge (Item 3.5) */}
                   <div
                     style={{ left: `${todayPct}%` }}
-                    className="absolute top-0 bottom-0 border-l-2 border-dashed border-indigo-400 pointer-events-none z-10"
-                    title={`Today (${todayIso})`}
-                  />
+                    className="absolute top-0 bottom-0 border-l-2 border-dashed border-indigo-500 pointer-events-none z-10"
+                    title={`Today (${formatDisplayDate(todayIso)})`}
+                  >
+                    <span className="absolute -top-3 left-1 px-1.5 py-0.5 rounded bg-indigo-600 text-white font-mono text-[9px] font-bold shadow-2xs whitespace-nowrap">
+                      Today: {formatShortDate(todayIso)}
+                    </span>
+                  </div>
 
-                  {/* Target Date ("Want Done") Line */}
+                  {/* Target Date ("Target") Line */}
                   {targetPct !== null && (
                     <div
                       style={{ left: `${targetPct}%` }}
                       className="absolute top-0 bottom-0 border-l-2 border-purple-500 pointer-events-none z-10"
-                      title={`Target Date — Want Done (${feature.targetDate})`}
+                      title={`Target (${formatDisplayDate(feature.targetDate)})`}
                     />
                   )}
 
-                  {/* Expected Date ("Expect Done") Line */}
+                  {/* Projected Date ("Projected") Line */}
                   {expectedPct !== null && (
                     <div
                       style={{ left: `${expectedPct}%` }}
                       className="absolute top-0 bottom-0 border-l-2 border-amber-500 pointer-events-none z-10"
-                      title={`Expected Date — Expect Done (${feature.expectedDate})`}
+                      title={`Projected (${formatDisplayDate(feature.expectedDate)})`}
                     />
                   )}
 
-                  {/* Gantt Duration Bar */}
+                  {/* Gantt Duration Bar (Items 3.2 & 3.3: solid color, no embedded text, hover tooltip) */}
                   <div
                     style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
-                    className={`relative z-20 h-7 rounded-lg px-2.5 flex items-center justify-between gap-2 text-[11px] shadow-sm transition ${
+                    title={`${stage.name} • ${formatShortDate(startIso)} → ${formatShortDate(endIso)} (${durationDays}d) • ${
+                      isCompleted ? "Done" : isCurrent ? "Active Now" : "Pending"
+                    }`}
+                    className={`relative z-20 h-7 rounded-lg px-2 flex items-center justify-center text-[11px] shadow-xs transition group cursor-help ${
                       isCurrent
-                        ? "bg-gradient-to-r from-indigo-600 to-sky-600 text-white font-bold ring-2 ring-indigo-400/50 shadow-indigo-500/20"
+                        ? "bg-indigo-600 text-white font-bold ring-2 ring-indigo-400/50 shadow-indigo-500/20"
                         : isCompleted
-                        ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-medium"
-                        : "bg-slate-100 text-slate-700 border border-slate-300 font-medium"
+                        ? "bg-emerald-500 text-white font-medium"
+                        : "bg-slate-200 text-slate-700 border border-slate-300 font-medium"
                     }`}
                   >
-                    <span className="truncate">
-                      {stage.name}
-                    </span>
-                    <span className="font-mono text-[10px] opacity-90 shrink-0 hidden md:inline">
-                      {startIso ? startIso.slice(5) : ""}
-                      {endIso ? `→${endIso.slice(5)}` : ""}
-                    </span>
+                    {/* Hover Tooltip Card */}
+                    <div className="hidden group-hover:block absolute bottom-full mb-1 left-1/2 -translate-x-1/2 px-2.5 py-1 bg-slate-900 text-white text-xs rounded-md shadow-lg whitespace-nowrap z-50 pointer-events-none">
+                      <div className="font-semibold">{stage.name}</div>
+                      <div className="text-[10px] text-slate-300">
+                        {formatShortDate(startIso)} → {formatShortDate(endIso)} ({durationDays}d) •{" "}
+                        {isCompleted ? "Done" : isCurrent ? "Active Now" : "Pending"}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

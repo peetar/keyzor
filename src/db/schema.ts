@@ -5,6 +5,7 @@ import {
   boolean,
   timestamp,
   jsonb,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 export interface StageTemplateItem {
@@ -77,6 +78,7 @@ export const users = pgTable("users", {
   id: text("id").primaryKey(),
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
+  username: text("username"),
   image: text("image"),
   provider: text("provider").notNull().default("credentials"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -94,23 +96,27 @@ export const apiKeys = pgTable("api_keys", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const projects = pgTable("projects", {
-  id: text("id").primaryKey(),
-  ownerId: text("owner_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  slug: text("slug").notNull().unique(),
-  name: text("name").notNull(),
-  description: text("description").notNull().default(""),
-  shareEnabled: boolean("share_enabled").notNull().default(true),
-  shareVersion: text("share_version").notNull(),
-  defaultStages: jsonb("default_stages")
-    .$type<StageTemplateItem[]>()
-    .notNull()
-    .default(DEFAULT_ARCHITECT_STAGES),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+export const projects = pgTable(
+  "projects",
+  {
+    id: text("id").primaryKey(),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    shareEnabled: boolean("share_enabled").notNull().default(true),
+    shareVersion: text("share_version").notNull(),
+    defaultStages: jsonb("default_stages")
+      .$type<StageTemplateItem[]>()
+      .notNull()
+      .default(DEFAULT_ARCHITECT_STAGES),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("projects_owner_slug_idx").on(t.ownerId, t.slug)]
+);
 
 export const features = pgTable("features", {
   id: text("id").primaryKey(),
