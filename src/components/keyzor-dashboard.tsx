@@ -304,6 +304,7 @@ export function KeyzorDashboard({
         }),
       });
       await refreshProjects(currentProject?.id);
+      router.refresh();
     } finally {
       setIsLoading(false);
     }
@@ -322,6 +323,7 @@ export function KeyzorDashboard({
         }),
       });
       await refreshProjects(currentProject?.id);
+      router.refresh();
     } finally {
       setIsLoading(false);
     }
@@ -427,6 +429,7 @@ export function KeyzorDashboard({
       });
       setEditingFeature(null);
       await refreshProjects(currentProject?.id);
+      router.refresh();
     } finally {
       setIsLoading(false);
     }
@@ -1449,7 +1452,7 @@ export function KeyzorDashboard({
                                 />
                                 <span className="whitespace-nowrap">{feat.fourQuestions.where.stageName}</span>
                                 <span className="text-slate-500 font-mono text-[11px] whitespace-nowrap">
-                                  ({feat.fourQuestions.where.stageIndex + 1}/
+                                  (Stage {feat.fourQuestions.where.stageIndex + 1}/
                                   {feat.fourQuestions.where.totalStages})
                                 </span>
                               </div>

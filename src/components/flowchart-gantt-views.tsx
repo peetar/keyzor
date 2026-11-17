@@ -180,7 +180,7 @@ export function FourQuestionsCardRow({
           <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-1">
             <span>Stage</span>
             <span className="text-indigo-600 font-semibold">
-              {q.where.stageIndex + 1}/{q.where.totalStages} ({q.where.percentComplete}%)
+              Stage {q.where.stageIndex + 1} of {q.where.totalStages} • {q.where.percentComplete}%
             </span>
           </div>
           <div className="flex items-center gap-2 mt-1 min-w-0">

@@ -1268,7 +1268,7 @@ function inferLinkType(url: string, label: string): string {
 export interface UpdateFeatureStatusInput {
   featureIdOrSlug: string;
   // Transition control
-  action?: "advance" | "revert" | "previous" | "set_stage" | "complete_feature" | "reopen";
+  action?: "advance" | "revert" | "previous" | "return" | "set_stage" | "complete_feature" | "reopen";
   stageId?: string;
   stageName?: string;
   // The 4 Core Questions updates
@@ -1316,7 +1316,11 @@ export async function updateFeatureStatus(
     const nextIdx = Math.min(currentIdx + 1, stages.length - 1);
     targetStage = stages[nextIdx];
     actionSummaryParts.push(`Advanced to '${targetStage.name}'`);
-  } else if (input.action === "revert" || input.action === "previous") {
+  } else if (
+    input.action === "revert" ||
+    input.action === "previous" ||
+    input.action === "return"
+  ) {
     const currentIdx = stages.findIndex((s) => s.id === targetStage?.id);
     const prevIdx = Math.max(0, currentIdx - 1);
     targetStage = stages[prevIdx];
@@ -1348,6 +1352,7 @@ export async function updateFeatureStatus(
     input.action === "advance" ||
     input.action === "revert" ||
     input.action === "previous" ||
+    input.action === "return" ||
     input.action === "set_stage" ||
     input.stageId ||
     input.stageName ||
@@ -1374,7 +1379,7 @@ export async function updateFeatureStatus(
             actualStartDate: input.actualStartDate || s.actualStartDate || today,
             actualEndDate: isMarkingCompleted
               ? input.actualEndDate || s.actualEndDate || today
-              : input.actualEndDate ?? null,
+              : null,
             plannedStartDate: input.plannedStartDate ?? s.plannedStartDate,
             plannedEndDate: input.plannedEndDate ?? s.plannedEndDate,
             notes: input.notes !== undefined ? input.notes : s.notes,
@@ -1386,6 +1391,7 @@ export async function updateFeatureStatus(
           .update(schema.featureStages)
           .set({
             status: "pending",
+            actualEndDate: null,
             updatedAt: new Date(),
           })
           .where(eq(schema.featureStages.id, s.id));
@@ -1412,11 +1418,16 @@ export async function updateFeatureStatus(
     input.targetDate !== undefined ? input.targetDate : feature.targetDate;
   const updatedExpectedDate =
     input.expectedDate !== undefined ? input.expectedDate : feature.expectedDate;
+  const isReturning =
+    input.action === "return" ||
+    input.action === "revert" ||
+    input.action === "previous";
   const isFinalStage =
-    isMarkingCompleted ||
-    (newStageIdx === stages.length - 1 &&
-      targetStage?.name.toLowerCase().includes("production") &&
-      input.status === "completed");
+    !isReturning &&
+    (isMarkingCompleted ||
+      (newStageIdx === stages.length - 1 &&
+        targetStage?.name.toLowerCase().includes("production") &&
+        input.status === "completed"));
 
   if (input.currentOwner && input.currentOwner !== feature.currentOwner) {
     actionSummaryParts.push(`Owner → ${input.currentOwner}`);
@@ -1441,7 +1452,7 @@ export async function updateFeatureStatus(
       currentOwner: updatedOwner,
       targetDate: updatedTargetDate,
       expectedDate: updatedExpectedDate,
-      status: isFinalStage ? "completed" : input.status ?? feature.status,
+      status: isFinalStage ? "completed" : isReturning ? "active" : input.status ?? feature.status,
       updatedAt: new Date(),
     })
     .where(eq(schema.features.id, feature.id));
