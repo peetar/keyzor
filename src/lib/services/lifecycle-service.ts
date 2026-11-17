@@ -300,6 +300,65 @@ export async function getUserById(
   return rows[0] || null;
 }
 
+export const RESERVED_USERNAMES = new Set([
+  "api",
+  "admin",
+  "dashboard",
+  "login",
+  "join",
+  "hello",
+  "share",
+  "settings",
+  "project",
+  "projects",
+  "feature",
+  "features",
+  "user",
+  "users",
+  "demo",
+  "root",
+  "auth",
+  "null",
+  "undefined",
+]);
+
+export async function generateUniqueUsername(
+  desired: string,
+  excludeUserId?: string
+): Promise<string> {
+  await ensureDatabaseReady();
+  let base = slugify(desired || "user");
+  if (!base || base.length < 2) {
+    base = "user";
+  }
+
+  let candidate = base;
+  if (RESERVED_USERNAMES.has(candidate.toLowerCase())) {
+    candidate = `${candidate}-${crypto.randomBytes(2).toString("hex")}`;
+  }
+
+  let suffix = 1;
+  while (true) {
+    const existing = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(
+        and(
+          sql`LOWER(${schema.users.username}) = ${candidate.toLowerCase()}`,
+          excludeUserId ? sql`${schema.users.id} != ${excludeUserId}` : sql`1=1`,
+          sql`${schema.users.id} != ${DEFAULT_USER_ID}`
+        )
+      );
+
+    if (existing.length === 0) {
+      return candidate;
+    }
+
+    suffix++;
+    candidate = `${base}-${suffix}`;
+  }
+}
+
 export async function updateUsername(
   userId: string,
   newUsername: string
@@ -313,13 +372,21 @@ export async function updateUsername(
     };
   }
 
+  if (RESERVED_USERNAMES.has(cleaned.toLowerCase())) {
+    return {
+      success: false,
+      error: `'@${cleaned}' is a reserved system route name. Please choose a different handle.`,
+    };
+  }
+
   const existing = await db
     .select()
     .from(schema.users)
     .where(
       and(
         sql`LOWER(${schema.users.username}) = ${cleaned.toLowerCase()}`,
-        sql`${schema.users.id} != ${userId}`
+        sql`${schema.users.id} != ${userId}`,
+        sql`${schema.users.id} != ${DEFAULT_USER_ID}`
       )
     );
 
@@ -1591,15 +1658,15 @@ export async function getOrCreateUser(input: {
       user.image = input.image;
     }
     if (input.username) {
-      const u = slugify(input.username);
       if (
         !user.username ||
         user.username === "petertrice" ||
         user.username === "creator" ||
         user.username === "demo"
       ) {
-        updates.username = u;
-        user.username = u;
+        const uniqueHandle = await generateUniqueUsername(input.username, user.id);
+        updates.username = uniqueHandle;
+        user.username = uniqueHandle;
       }
     }
     if (Object.keys(updates).length > 0) {
@@ -1610,9 +1677,8 @@ export async function getOrCreateUser(input: {
     }
   } else {
     const id = `usr_${crypto.randomBytes(6).toString("hex")}`;
-    const username = input.username
-      ? slugify(input.username)
-      : slugify(input.name || input.email.split("@")[0]);
+    const rawDesired = input.username || input.name || input.email.split("@")[0];
+    const username = await generateUniqueUsername(rawDesired);
     user = {
       id,
       email: normalizedEmail,

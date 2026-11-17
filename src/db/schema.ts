@@ -74,15 +74,19 @@ export const DEFAULT_ARCHITECT_STAGES: StageTemplateItem[] = [
   },
 ];
 
-export const users = pgTable("users", {
-  id: text("id").primaryKey(),
-  email: text("email").notNull().unique(),
-  name: text("name").notNull(),
-  username: text("username"),
-  image: text("image"),
-  provider: text("provider").notNull().default("credentials"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const users = pgTable(
+  "users",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull().unique(),
+    name: text("name").notNull(),
+    username: text("username"),
+    image: text("image"),
+    provider: text("provider").notNull().default("credentials"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("users_username_unique_idx").on(t.username)]
+);
 
 export const apiKeys = pgTable("api_keys", {
   id: text("id").primaryKey(),

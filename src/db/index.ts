@@ -250,6 +250,33 @@ export async function ensureDatabaseReady(): Promise<void> {
       `);
     } catch {}
 
+    try {
+      // Disambiguate any existing duplicate non-null usernames before creating index
+      const duplicateUsers = await activeDb.execute(sql`
+        SELECT id, username, email, created_at,
+               ROW_NUMBER() OVER (PARTITION BY LOWER(username) ORDER BY created_at ASC) as rn
+        FROM users
+        WHERE username IS NOT NULL AND id != 'usr_architect_peter'
+      `);
+      const rows = (duplicateUsers as any).rows || duplicateUsers || [];
+      for (const row of rows) {
+        if (row.rn > 1) {
+          const suffix = Math.floor(1000 + Math.random() * 9000);
+          await activeDb.execute(sql`
+            UPDATE users SET username = ${row.username + "-" + suffix} WHERE id = ${row.id}
+          `);
+        }
+      }
+    } catch {}
+
+    try {
+      await activeDb.execute(sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique_idx
+        ON users (LOWER(username))
+        WHERE username IS NOT NULL AND id != 'usr_architect_peter';
+      `);
+    } catch {}
+
     const existingUsers = await activeDb
       .select()
       .from(schema.users)
