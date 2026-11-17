@@ -1,7 +1,7 @@
 import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
 import Google from "next-auth/providers/google";
-import { getOrCreateUser } from "@/lib/services/lifecycle-service";
+import { getOrCreateUser, getUserById } from "@/lib/services/lifecycle-service";
 
 const providers = [];
 
@@ -118,6 +118,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
 
         session.user.id = resolvedUserId;
+        let resolvedUsername =
+          typeof token?.username === "string" ? token.username : "";
+        if (!resolvedUsername && resolvedUserId) {
+          try {
+            const dbUser = await getUserById(resolvedUserId);
+            if (dbUser?.username) {
+              resolvedUsername = dbUser.username;
+            }
+          } catch {}
+        }
+        (session.user as any).username = resolvedUsername;
       }
       return session;
     },

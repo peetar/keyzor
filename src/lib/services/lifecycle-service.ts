@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { eq, asc, desc, and, inArray, sql } from "drizzle-orm";
+import { eq, asc, desc, and, or, inArray, sql } from "drizzle-orm";
 import {
   db,
   ensureDatabaseReady,
@@ -274,7 +274,7 @@ export function getUserCreatorSlug(user: {
     return slugify(user.username);
   }
   if (user.id === DEFAULT_USER_ID) {
-    return "petertrice";
+    return "demo";
   }
   if (user.name && user.name.trim()) {
     const s = slugify(user.name);
@@ -289,18 +289,72 @@ export function getUserCreatorSlug(user: {
   return slugify(user.id);
 }
 
+export async function getUserById(
+  id: string
+): Promise<typeof schema.users.$inferSelect | null> {
+  await ensureDatabaseReady();
+  const rows = await db
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.id, id));
+  return rows[0] || null;
+}
+
+export async function updateUsername(
+  userId: string,
+  newUsername: string
+): Promise<{ success: boolean; error?: string; username?: string }> {
+  await ensureDatabaseReady();
+  const cleaned = slugify(newUsername.trim());
+  if (!cleaned || cleaned.length < 2) {
+    return {
+      success: false,
+      error: "Username must be at least 2 characters and contain alphanumeric characters.",
+    };
+  }
+
+  const existing = await db
+    .select()
+    .from(schema.users)
+    .where(
+      and(
+        sql`LOWER(${schema.users.username}) = ${cleaned.toLowerCase()}`,
+        sql`${schema.users.id} != ${userId}`
+      )
+    );
+
+  if (existing.length > 0) {
+    return {
+      success: false,
+      error: `Username '@${cleaned}' is already taken by another user.`,
+    };
+  }
+
+  await db
+    .update(schema.users)
+    .set({ username: cleaned })
+    .where(eq(schema.users.id, userId));
+
+  return { success: true, username: cleaned };
+}
+
 export async function findUserByCreatorSlug(
   creatorSlug: string
 ): Promise<typeof schema.users.$inferSelect | null> {
   await ensureDatabaseReady();
   const normalized = creatorSlug.trim().toLowerCase();
+  const clean = normalized.replace(/[-_.]/g, "");
 
-  // 1. Direct username column match
+  // 1. Direct username column match (prefer real user over DEFAULT_USER_ID)
   const byUsername = await db
     .select()
     .from(schema.users)
     .where(sql`LOWER(${schema.users.username}) = ${normalized}`);
-  if (byUsername.length > 0) return byUsername[0];
+  if (byUsername.length > 0) {
+    const realUser = byUsername.find((u) => u.id !== DEFAULT_USER_ID);
+    if (realUser) return realUser;
+    return byUsername[0];
+  }
 
   // 2. Direct ID match
   const byId = await db
@@ -309,24 +363,33 @@ export async function findUserByCreatorSlug(
     .where(eq(schema.users.id, creatorSlug));
   if (byId.length > 0) return byId[0];
 
-  // 3. Fallback: match all users by computed creatorSlug
+  // 3. Fallback: match real users by computed creatorSlug, username, name, or email prefix
   const allUsers = await db.select().from(schema.users);
-  for (const u of allUsers) {
-    if (getUserCreatorSlug(u).toLowerCase() === normalized) {
+  const realUsers = allUsers.filter((u) => u.id !== DEFAULT_USER_ID);
+
+  for (const u of realUsers) {
+    const computed = getUserCreatorSlug(u).toLowerCase();
+    const uName = slugify(u.name || "").toLowerCase();
+    const uEmail = slugify((u.email || "").split("@")[0]).toLowerCase();
+    if (
+      computed === normalized ||
+      uName === normalized ||
+      uEmail === normalized ||
+      computed.replace(/[-_.]/g, "") === clean ||
+      uName.replace(/[-_.]/g, "") === clean ||
+      uEmail.replace(/[-_.]/g, "") === clean
+    ) {
       return u;
     }
   }
 
-  // 4. Special fallback for "petertrice"
-  if (normalized === "petertrice") {
-    const defaultUser = allUsers.find(
-      (u) =>
-        u.id === DEFAULT_USER_ID ||
-        u.email.toLowerCase().includes("peter") ||
-        u.name.toLowerCase().includes("peter")
-    );
-    if (defaultUser) return defaultUser;
-    if (allUsers.length > 0) return allUsers[0];
+  // 4. Seed demo user fallback if specifically requested
+  const seedUser = allUsers.find((u) => u.id === DEFAULT_USER_ID);
+  if (seedUser) {
+    const computed = getUserCreatorSlug(seedUser).toLowerCase();
+    if (computed === normalized || normalized === "demo" || normalized === "architect") {
+      return seedUser;
+    }
   }
 
   return null;
@@ -338,37 +401,113 @@ export async function getProjectByCreatorAndSlug(
   forUserId?: string
 ): Promise<EnrichedProject | null> {
   await ensureDatabaseReady();
-  const creator = await findUserByCreatorSlug(creatorSlug);
-  if (!creator) return null;
 
-  const rows = await db
-    .select()
+  const normalizedCreator = creatorSlug.trim().toLowerCase();
+  const normalizedProject = projectSlug.trim().toLowerCase();
+  const cleanCreator = normalizedCreator.replace(/[-_.]/g, "");
+
+  // 1. Direct query of projects joined with owner where project slug matches
+  const candidateProjects = await db
+    .select({
+      project: schema.projects,
+      owner: schema.users,
+    })
     .from(schema.projects)
+    .innerJoin(schema.users, eq(schema.projects.ownerId, schema.users.id))
     .where(
-      and(
-        eq(schema.projects.ownerId, creator.id),
-        eq(schema.projects.slug, projectSlug)
+      or(
+        eq(schema.projects.slug, projectSlug),
+        sql`LOWER(${schema.projects.slug}) = ${normalizedProject}`
       )
     );
 
-  let project = rows[0];
+  let matchedProject: typeof schema.projects.$inferSelect | undefined;
 
-  if (!project) {
-    const caseMatch = await db
-      .select()
-      .from(schema.projects)
-      .where(
-        and(
-          eq(schema.projects.ownerId, creator.id),
-          sql`LOWER(${schema.projects.slug}) = ${projectSlug.toLowerCase()}`
-        )
-      );
-    project = caseMatch[0];
+  // 2. Find candidate whose owner matches creatorSlug
+  for (const { project, owner } of candidateProjects) {
+    const ownerCreator = getUserCreatorSlug(owner).toLowerCase();
+    const ownerUsername = (owner.username || "").toLowerCase();
+    const ownerId = owner.id.toLowerCase();
+    const ownerNameSlug = slugify(owner.name || "").toLowerCase();
+    const ownerEmailPrefix = slugify((owner.email || "").split("@")[0]).toLowerCase();
+
+    const isMatch =
+      ownerCreator === normalizedCreator ||
+      ownerUsername === normalizedCreator ||
+      ownerId === normalizedCreator ||
+      ownerNameSlug === normalizedCreator ||
+      ownerEmailPrefix === normalizedCreator ||
+      ownerCreator.replace(/[-_.]/g, "") === cleanCreator ||
+      ownerUsername.replace(/[-_.]/g, "") === cleanCreator ||
+      ownerNameSlug.replace(/[-_.]/g, "") === cleanCreator ||
+      ownerEmailPrefix.replace(/[-_.]/g, "") === cleanCreator;
+
+    if (isMatch) {
+      if (forUserId && owner.id === forUserId) {
+        matchedProject = project;
+        break;
+      }
+      if (!matchedProject) {
+        matchedProject = project;
+      }
+    }
   }
 
-  if (!project) return null;
+  // 3. Fallback: If logged-in user owns one of the candidate projects with this slug,
+  // accept it (handles any creator alias in URL, like 'petertrice' vs 'peetar')
+  if (!matchedProject && forUserId) {
+    const ownedByForUser = candidateProjects.find(
+      (c) => c.owner.id === forUserId
+    );
+    if (ownedByForUser) {
+      matchedProject = ownedByForUser.project;
+    }
+  }
 
-  return getProjectByIdOrSlug(project.id, forUserId);
+  // 4. Fallback: If user is collaborator on one of the candidates
+  if (!matchedProject && forUserId) {
+    for (const { project } of candidateProjects) {
+      const isCollab = await db
+        .select()
+        .from(schema.projectCollaborators)
+        .where(
+          and(
+            eq(schema.projectCollaborators.projectId, project.id),
+            eq(schema.projectCollaborators.userId, forUserId)
+          )
+        );
+      if (isCollab.length > 0) {
+        matchedProject = project;
+        break;
+      }
+    }
+  }
+
+  // 5. Fallback: Check if creator can be resolved through findUserByCreatorSlug
+  if (!matchedProject) {
+    const creator = await findUserByCreatorSlug(creatorSlug);
+    if (creator) {
+      const rows = await db
+        .select()
+        .from(schema.projects)
+        .where(
+          and(
+            eq(schema.projects.ownerId, creator.id),
+            or(
+              eq(schema.projects.slug, projectSlug),
+              sql`LOWER(${schema.projects.slug}) = ${normalizedProject}`
+            )
+          )
+        );
+      if (rows.length > 0) {
+        matchedProject = rows[0];
+      }
+    }
+  }
+
+  if (!matchedProject) return null;
+
+  return getProjectByIdOrSlug(matchedProject.id, forUserId);
 }
 
 export async function getProjectByIdOrSlug(
@@ -1451,10 +1590,17 @@ export async function getOrCreateUser(input: {
       updates.image = input.image;
       user.image = input.image;
     }
-    if (input.username && !user.username) {
+    if (input.username) {
       const u = slugify(input.username);
-      updates.username = u;
-      user.username = u;
+      if (
+        !user.username ||
+        user.username === "petertrice" ||
+        user.username === "creator" ||
+        user.username === "demo"
+      ) {
+        updates.username = u;
+        user.username = u;
+      }
     }
     if (Object.keys(updates).length > 0) {
       await db

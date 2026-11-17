@@ -48,6 +48,7 @@ export default async function FeaturePage(props: FeaturePageProps) {
 
   const userEmail = session.user.email || "";
   const userName = session.user.name || "Architect";
+  const userUsername = (session.user as any).username || "";
 
   return (
     <KeyzorDashboard
@@ -57,6 +58,7 @@ export default async function FeaturePage(props: FeaturePageProps) {
       focusedFeatureId={foundFeature.id}
       creatorSlug={projectData.creatorSlug || creator}
       projectSlug={projectData.slug}
+      userUsername={userUsername}
       defaultApiKey=""
       userEmail={userEmail}
       userName={userName}

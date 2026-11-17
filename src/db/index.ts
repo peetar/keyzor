@@ -245,9 +245,8 @@ export async function ensureDatabaseReady(): Promise<void> {
     try {
       await activeDb.execute(sql`
         UPDATE users
-        SET username = 'petertrice'
-        WHERE (id = 'usr_architect_peter' OR LOWER(email) LIKE '%peter%' OR LOWER(name) LIKE '%peter%')
-          AND (username IS NULL OR username = '');
+        SET username = 'demo'
+        WHERE id = 'usr_architect_peter';
       `);
     } catch {}
 

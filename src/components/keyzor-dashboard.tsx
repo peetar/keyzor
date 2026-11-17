@@ -72,6 +72,7 @@ interface KeyzorDashboardProps {
   defaultApiKey: string;
   userEmail: string;
   userName: string;
+  userUsername?: string;
   currentUserId?: string;
   mode?: "home" | "project" | "feature";
   focusedFeatureId?: string;
@@ -85,6 +86,7 @@ export function KeyzorDashboard({
   defaultApiKey,
   userEmail,
   userName,
+  userUsername,
   currentUserId,
   mode = "home",
   focusedFeatureId,
@@ -93,6 +95,14 @@ export function KeyzorDashboard({
 }: KeyzorDashboardProps) {
   const router = useRouter();
   const [projects, setProjects] = useState<EnrichedProject[]>(initialProjects);
+  const [currentUsername, setCurrentUsername] = useState<string>(
+    userUsername || creatorSlug || ""
+  );
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [newUsernameInput, setNewUsernameInput] = useState("");
+  const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
+  const [userUpdateError, setUserUpdateError] = useState<string | null>(null);
+  const [userUpdateSuccess, setUserUpdateSuccess] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
     initialSelectedProjectId && initialProjects.some((p) => p.id === initialSelectedProjectId)
       ? initialSelectedProjectId
@@ -163,9 +173,46 @@ export function KeyzorDashboard({
     projects.find((p) => p.id === selectedProjectId) || projects[0];
 
   const effectiveCreatorSlug =
+    currentUsername ||
     creatorSlug ||
     currentProject?.creatorSlug ||
     (currentProject?.ownerEmail ? currentProject.ownerEmail.split("@")[0] : "creator");
+
+  const handleUpdateUsername = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const target = newUsernameInput.trim().toLowerCase();
+    if (!target) return;
+    setIsUpdatingUsername(true);
+    setUserUpdateError(null);
+    setUserUpdateSuccess(null);
+    try {
+      const res = await fetch("/api/v1/user", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: target }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setUserUpdateError(data.error || "Failed to update username.");
+      } else {
+        const updated = data.data?.username || target;
+        setCurrentUsername(updated);
+        setUserUpdateSuccess("Username updated successfully!");
+        setTimeout(() => setShowUserModal(false), 1200);
+        if (mode === "project" && currentProject) {
+          router.push(`/${updated}/${currentProject.slug}`);
+        } else if (mode === "feature" && currentProject && focusedFeature) {
+          router.push(`/${updated}/${currentProject.slug}/${focusedFeature.slug}`);
+        } else {
+          await refreshProjects(selectedProjectId);
+        }
+      }
+    } catch (err: any) {
+      setUserUpdateError(err?.message || "Failed to update username.");
+    } finally {
+      setIsUpdatingUsername(false);
+    }
+  };
 
   const focusedFeature =
     focusedFeatureId && currentProject
@@ -822,9 +869,24 @@ export function KeyzorDashboard({
 
             {/* User Badge & Sign Out */}
             <div className="hidden lg:flex items-center gap-2 pl-2 border-l border-slate-200 text-xs text-slate-500">
-              <span className="truncate max-w-[140px] font-medium" title={userEmail}>
-                {userName}
-              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setNewUsernameInput(currentUsername || effectiveCreatorSlug);
+                  setUserUpdateError(null);
+                  setUserUpdateSuccess(null);
+                  setShowUserModal(true);
+                }}
+                className="flex flex-col text-left hover:opacity-80 transition cursor-pointer group"
+                title="Account Settings — click to edit username handle"
+              >
+                <span className="truncate max-w-[140px] font-semibold text-slate-800 group-hover:text-indigo-600 transition-colors">
+                  {userName}
+                </span>
+                <span className="truncate max-w-[140px] font-mono text-[10px] text-indigo-600 font-medium">
+                  @{currentUsername || effectiveCreatorSlug}
+                </span>
+              </button>
               <button
                 type="button"
                 onClick={async () => {
@@ -2794,6 +2856,95 @@ export function KeyzorDashboard({
                 {isLoading ? "Deleting..." : "Permanently Delete Project"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 8: User Settings / Change Username */}
+      {showUserModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Account Handle &amp; Settings
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Your handle forms the base URL for all your projects and features.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowUserModal(false)}
+                className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateUsername} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">
+                  Username Handle
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-xs font-mono text-slate-400">
+                    @
+                  </span>
+                  <input
+                    type="text"
+                    value={newUsernameInput}
+                    onChange={(e) =>
+                      setNewUsernameInput(
+                        e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, "")
+                      )
+                    }
+                    placeholder="e.g. peetar"
+                    className="w-full pl-7 pr-3 py-2 text-xs font-mono border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    required
+                  />
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  URL preview:{" "}
+                  <span className="font-mono text-indigo-600">
+                    keyzor.vercel.app/{newUsernameInput || "username"}/[project]
+                  </span>
+                </p>
+              </div>
+
+              {userUpdateError && (
+                <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 font-medium">
+                  {userUpdateError}
+                </div>
+              )}
+
+              {userUpdateSuccess && (
+                <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-700 font-medium">
+                  {userUpdateSuccess}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowUserModal(false)}
+                  className="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-700 shadow-2xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={
+                    isUpdatingUsername ||
+                    !newUsernameInput.trim() ||
+                    newUsernameInput.trim() === currentUsername
+                  }
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold shadow-xs"
+                >
+                  {isUpdatingUsername ? "Saving..." : "Save Handle"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

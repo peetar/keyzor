@@ -34,6 +34,7 @@ export default async function ProjectPage(props: ProjectPageProps) {
 
   const userEmail = session.user.email || "";
   const userName = session.user.name || "Architect";
+  const userUsername = (session.user as any).username || "";
 
   return (
     <KeyzorDashboard
@@ -42,6 +43,7 @@ export default async function ProjectPage(props: ProjectPageProps) {
       initialSelectedProjectId={projectData.id}
       creatorSlug={projectData.creatorSlug || creator}
       projectSlug={projectData.slug}
+      userUsername={userUsername}
       defaultApiKey=""
       userEmail={userEmail}
       userName={userName}

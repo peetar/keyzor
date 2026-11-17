@@ -21,7 +21,8 @@ export default async function HomePage(props: {
 
   const userEmail = session.user.email || "";
   const userName = session.user.name || "Architect";
-  const creatorSlug = (session.user as any).username || (userEmail ? userEmail.split("@")[0] : "creator");
+  const userUsername = (session.user as any).username || "";
+  const creatorSlug = userUsername || (userEmail ? userEmail.split("@")[0] : "creator");
 
   return (
     <KeyzorDashboard
@@ -29,6 +30,7 @@ export default async function HomePage(props: {
       initialProjects={projects}
       initialSelectedProjectId={searchParams?.project}
       creatorSlug={creatorSlug}
+      userUsername={userUsername}
       defaultApiKey=""
       userEmail={userEmail}
       userName={userName}
