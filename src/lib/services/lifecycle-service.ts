@@ -75,6 +75,7 @@ export interface EnrichedFeature {
     linkType: string;
     createdBy: string;
   }>;
+  createdAt: string;
   updatedAt: string;
 }
 
@@ -962,7 +963,14 @@ export async function getFeatureByIdOrSlug(
       linkType: l.linkType,
       createdBy: l.createdBy,
     })),
-    updatedAt: feature.updatedAt.toISOString(),
+    createdAt:
+      feature.createdAt instanceof Date
+        ? feature.createdAt.toISOString()
+        : String(feature.createdAt || feature.updatedAt),
+    updatedAt:
+      feature.updatedAt instanceof Date
+        ? feature.updatedAt.toISOString()
+        : String(feature.updatedAt),
   };
 }
 

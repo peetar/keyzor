@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOutAction } from "@/app/actions/auth-actions";
@@ -54,6 +54,8 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronsUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 
 function dedupLinks<T extends { url: string }>(links: T[]): T[] {
@@ -64,6 +66,28 @@ function dedupLinks<T extends { url: string }>(links: T[]): T[] {
     seen.add(key);
     return true;
   });
+}
+
+export type TableSortOption =
+  | "incomplete_first"
+  | "stage"
+  | "updated_at"
+  | "created_at"
+  | "title"
+  | "owner"
+  | "timeline";
+
+const COOKIE_SORT_KEY = "keyzor_table_sort";
+
+function writeSortCookie(option: TableSortOption, order: "asc" | "desc") {
+  if (typeof document === "undefined") return;
+  try {
+    const val = encodeURIComponent(`${option}:${order}`);
+    const oneYearSeconds = 365 * 24 * 60 * 60;
+    document.cookie = `${COOKIE_SORT_KEY}=${val}; path=/; max-age=${oneYearSeconds}; SameSite=Lax`;
+  } catch (err) {
+    console.warn("Failed to write sort cookie:", err);
+  }
 }
 
 interface KeyzorDashboardProps {
@@ -78,6 +102,8 @@ interface KeyzorDashboardProps {
   focusedFeatureId?: string;
   creatorSlug?: string;
   projectSlug?: string;
+  initialSortBy?: TableSortOption;
+  initialSortOrder?: "asc" | "desc";
 }
 
 export function KeyzorDashboard({
@@ -92,6 +118,8 @@ export function KeyzorDashboard({
   focusedFeatureId,
   creatorSlug,
   projectSlug,
+  initialSortBy,
+  initialSortOrder,
 }: KeyzorDashboardProps) {
   const router = useRouter();
   const [projects, setProjects] = useState<EnrichedProject[]>(initialProjects);
@@ -329,12 +357,63 @@ export function KeyzorDashboard({
     }
   };
 
-  // Table search, filter, and sort state (Item 1.1)
+  // Table search, filter, and sort state (Item 1.1 + sort options & cookie persistence)
   const [tableSearch, setTableSearch] = useState("");
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<"title" | "stage" | "owner" | "timeline">("title");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [sortBy, setSortBy] = useState<TableSortOption>(
+    initialSortBy || "incomplete_first"
+  );
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(
+    initialSortOrder || "desc"
+  );
+
+  // Sync sort preference from cookie on client mount if available
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const match = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith(`${COOKIE_SORT_KEY}=`));
+    if (match) {
+      const raw = decodeURIComponent(match.split("=")[1] || "");
+      const [b, o] = raw.split(":");
+      if (
+        [
+          "incomplete_first",
+          "stage",
+          "updated_at",
+          "created_at",
+          "title",
+          "owner",
+          "timeline",
+        ].includes(b)
+      ) {
+        setSortBy(b as TableSortOption);
+      }
+      if (o === "asc" || o === "desc") {
+        setSortOrder(o);
+      }
+    }
+  }, []);
+
+  const handleSortChange = (newSortBy: TableSortOption, newOrder?: "asc" | "desc") => {
+    let nextOrder: "asc" | "desc";
+    if (newOrder) {
+      nextOrder = newOrder;
+    } else if (newSortBy === sortBy) {
+      nextOrder = sortOrder === "asc" ? "desc" : "asc";
+    } else {
+      nextOrder =
+        newSortBy === "incomplete_first" ||
+        newSortBy === "created_at" ||
+        newSortBy === "updated_at"
+          ? "desc"
+          : "asc";
+    }
+    setSortBy(newSortBy);
+    setSortOrder(nextOrder);
+    writeSortCookie(newSortBy, nextOrder);
+  };
 
   const uniqueOwners = useMemo(() => {
     const set = new Set<string>();
@@ -374,12 +453,62 @@ export function KeyzorDashboard({
       })
       .sort((a, b) => {
         let cmp = 0;
-        if (sortBy === "title") {
-          cmp = a.title.localeCompare(b.title);
+
+        if (sortBy === "incomplete_first") {
+          // Feature is done if status === "completed" OR percentComplete === 100
+          const aDone =
+            a.status === "completed" ||
+            a.fourQuestions?.where?.percentComplete === 100 ||
+            (a.stages && a.stages.length > 0 && a.stages.every((s) => s.status === "completed"));
+          const bDone =
+            b.status === "completed" ||
+            b.fourQuestions?.where?.percentComplete === 100 ||
+            (b.stages && b.stages.length > 0 && b.stages.every((s) => s.status === "completed"));
+
+          const aIncompleteStages = aDone
+            ? 0
+            : (a.stages || []).filter((s) => s.status !== "completed").length;
+          const bIncompleteStages = bDone
+            ? 0
+            : (b.stages || []).filter((s) => s.status !== "completed").length;
+
+          if (aDone !== bDone) {
+            // Incomplete features first (at top), done (7/7) features at bottom
+            cmp = aDone ? 1 : -1;
+          } else if (!aDone && !bDone) {
+            // Both incomplete: sort by incomplete stage count descending (most stages remaining first)
+            if (aIncompleteStages !== bIncompleteStages) {
+              cmp = bIncompleteStages - aIncompleteStages;
+            } else {
+              // Tie-break by stage index ascending (Stage 1 -> Stage 2 ...)
+              const aStage = a.fourQuestions?.where?.stageIndex ?? 0;
+              const bStage = b.fourQuestions?.where?.stageIndex ?? 0;
+              cmp = aStage - bStage;
+            }
+          } else {
+            // Both done: sort by updatedAt descending
+            const aTime = new Date(a.updatedAt || 0).getTime();
+            const bTime = new Date(b.updatedAt || 0).getTime();
+            cmp = bTime - aTime;
+          }
+
+          return sortOrder === "asc" ? -cmp : cmp;
+        }
+
+        if (sortBy === "created_at") {
+          const aTime = new Date(a.createdAt || a.updatedAt || 0).getTime();
+          const bTime = new Date(b.createdAt || b.updatedAt || 0).getTime();
+          cmp = aTime - bTime;
+        } else if (sortBy === "updated_at") {
+          const aTime = new Date(a.updatedAt || 0).getTime();
+          const bTime = new Date(b.updatedAt || 0).getTime();
+          cmp = aTime - bTime;
         } else if (sortBy === "stage") {
           const aIdx = a.fourQuestions?.where?.stageIndex ?? 0;
           const bIdx = b.fourQuestions?.where?.stageIndex ?? 0;
           cmp = aIdx - bIdx;
+        } else if (sortBy === "title") {
+          cmp = a.title.localeCompare(b.title);
         } else if (sortBy === "owner") {
           const aOwner = a.fourQuestions?.who || a.currentOwner || "";
           const bOwner = b.fourQuestions?.who || b.currentOwner || "";
@@ -389,6 +518,13 @@ export function KeyzorDashboard({
           const bDate = b.fourQuestions?.whenExpectDone || b.expectedDate || "";
           cmp = aDate.localeCompare(bDate);
         }
+
+        if (cmp === 0) {
+          const aTime = new Date(a.updatedAt || 0).getTime();
+          const bTime = new Date(b.updatedAt || 0).getTime();
+          return bTime - aTime;
+        }
+
         return sortOrder === "asc" ? cmp : -cmp;
       });
   }, [displayFeatures, tableSearch, stageFilter, ownerFilter, sortBy, sortOrder]);
@@ -1293,6 +1429,45 @@ export function KeyzorDashboard({
                       </div>
                     )}
 
+                    {/* Sort Options */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-slate-500 font-medium text-[11px] uppercase font-mono tracking-wider hidden lg:inline">
+                        Sort:
+                      </span>
+                      <div className="relative">
+                        <select
+                          value={sortBy}
+                          onChange={(e) => handleSortChange(e.target.value as TableSortOption)}
+                          className="appearance-none pl-3 pr-8 py-1.5 rounded-lg border border-slate-300 bg-white text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        >
+                          <option value="incomplete_first">Incomplete First (Default)</option>
+                          <option value="created_at">Date Created</option>
+                          <option value="updated_at">Last Updated</option>
+                          <option value="stage">Current Stage</option>
+                          <option value="title">Feature Name</option>
+                          <option value="owner">Current Owner</option>
+                          <option value="timeline">Timeline</option>
+                        </select>
+                        <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleSortChange(sortBy, sortOrder === "asc" ? "desc" : "asc")}
+                        className="p-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition shadow-2xs"
+                        title={
+                          sortOrder === "asc"
+                            ? "Ascending order (click to switch to Descending)"
+                            : "Descending order (click to switch to Ascending)"
+                        }
+                      >
+                        {sortOrder === "asc" ? (
+                          <ArrowUp className="w-3.5 h-3.5 text-indigo-600" />
+                        ) : (
+                          <ArrowDown className="w-3.5 h-3.5 text-indigo-600" />
+                        )}
+                      </button>
+                    </div>
+
                     {(tableSearch || stageFilter !== "all" || ownerFilter !== "all") && (
                       <button
                         type="button"
@@ -1335,14 +1510,7 @@ export function KeyzorDashboard({
                         <tr className="border-b border-slate-200 text-[11px] font-mono uppercase text-slate-600 bg-slate-50 font-semibold select-none">
                           <th
                             className="py-2.5 px-4 cursor-pointer hover:text-indigo-600 transition"
-                            onClick={() => {
-                              if (sortBy === "title") {
-                                setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-                              } else {
-                                setSortBy("title");
-                                setSortOrder("asc");
-                              }
-                            }}
+                            onClick={() => handleSortChange("title")}
                           >
                             <div className="flex items-center gap-1">
                               <span>Feature</span>
@@ -1355,14 +1523,7 @@ export function KeyzorDashboard({
                           </th>
                           <th
                             className="py-2.5 px-4 cursor-pointer hover:text-indigo-600 transition"
-                            onClick={() => {
-                              if (sortBy === "stage") {
-                                setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-                              } else {
-                                setSortBy("stage");
-                                setSortOrder("asc");
-                              }
-                            }}
+                            onClick={() => handleSortChange("stage")}
                           >
                             <div className="flex items-center gap-1">
                               <span>Stage</span>
@@ -1375,14 +1536,7 @@ export function KeyzorDashboard({
                           </th>
                           <th
                             className="py-2.5 px-4 min-w-[160px] cursor-pointer hover:text-indigo-600 transition"
-                            onClick={() => {
-                              if (sortBy === "owner") {
-                                setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-                              } else {
-                                setSortBy("owner");
-                                setSortOrder("asc");
-                              }
-                            }}
+                            onClick={() => handleSortChange("owner")}
                           >
                             <div className="flex items-center gap-1">
                               <span>Current Owner</span>
@@ -1395,14 +1549,7 @@ export function KeyzorDashboard({
                           </th>
                           <th
                             className="py-2.5 px-4 cursor-pointer hover:text-indigo-600 transition"
-                            onClick={() => {
-                              if (sortBy === "timeline") {
-                                setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-                              } else {
-                                setSortBy("timeline");
-                                setSortOrder("asc");
-                              }
-                            }}
+                            onClick={() => handleSortChange("timeline")}
                           >
                             <div className="flex items-center gap-1">
                               <span>Timeline</span>
