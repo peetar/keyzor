@@ -833,9 +833,9 @@ export function KeyzorDashboard({
             {/* Agent Skill /hello Button */}
             <button
               onClick={() => setShowAgentModal(true)}
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-semibold transition shadow-2xs"
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 hover:text-slate-900 text-xs font-semibold transition shadow-2xs"
             >
-              <Terminal className="w-3.5 h-3.5 text-emerald-600" />
+              <Terminal className="w-3.5 h-3.5 text-slate-500" />
               <span>Agent Skill (/hello)</span>
             </button>
 
@@ -846,9 +846,9 @@ export function KeyzorDashboard({
                   setShareModalTab("collaborate");
                   setShowShareModal(true);
                 }}
-                className="relative inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-800 text-xs font-semibold transition shadow-2xs"
+                className="relative inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 hover:text-slate-900 text-xs font-semibold transition shadow-2xs"
               >
-                <Users className="w-3.5 h-3.5 text-indigo-600" />
+                <Users className="w-3.5 h-3.5 text-slate-500" />
                 <span>Share &amp; Collaborate</span>
                 {currentProject?.pendingRequestsCount && currentProject.pendingRequestsCount > 0 ? (
                   <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping absolute -top-0.5 -right-0.5" />
