@@ -32,8 +32,10 @@ function dedupLinks<T extends { url: string }>(links: T[]): T[] {
 
 export function StakeholderShareView({
   project,
+  shareToken,
 }: {
   project: EnrichedProject;
+  shareToken?: string;
 }) {
   const [viewMode, setViewMode] = useState<"gantt" | "flowchart" | "both">(
     "both"
@@ -149,7 +151,7 @@ export function StakeholderShareView({
                     <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
                       <div className="flex flex-wrap gap-1.5">
                         {dedupLinks(feat.links).map((l) => (
-                          <LinkBadge key={l.id} link={l} />
+                          <LinkBadge key={l.id} link={l} shareToken={shareToken} />
                         ))}
                         {dedupLinks(feat.links).length === 0 && (
                           <span className="text-xs text-slate-400">—</span>
@@ -225,7 +227,7 @@ export function StakeholderShareView({
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {dedupLinks(feature.links).map((lnk) => (
-                    <LinkBadge key={lnk.id} link={lnk} />
+                    <LinkBadge key={lnk.id} link={lnk} shareToken={shareToken} />
                   ))}
                 </div>
               </div>

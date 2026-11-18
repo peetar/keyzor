@@ -153,16 +153,37 @@ export async function ensureDatabaseReady(): Promise<void> {
     `);
 
     await activeDb.execute(sql`
+      CREATE TABLE IF NOT EXISTS feature_documents (
+        id TEXT PRIMARY KEY,
+        feature_id TEXT NOT NULL REFERENCES features(id) ON DELETE CASCADE,
+        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        filename TEXT NOT NULL,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        size_bytes INTEGER NOT NULL DEFAULT 0,
+        created_by TEXT NOT NULL DEFAULT 'Architect',
+        updated_by TEXT NOT NULL DEFAULT 'Architect',
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await activeDb.execute(sql`
       CREATE TABLE IF NOT EXISTS stage_links (
         id TEXT PRIMARY KEY,
         feature_id TEXT NOT NULL REFERENCES features(id) ON DELETE CASCADE,
         stage_id TEXT REFERENCES feature_stages(id) ON DELETE SET NULL,
+        document_id TEXT REFERENCES feature_documents(id) ON DELETE CASCADE,
         label TEXT NOT NULL,
         url TEXT NOT NULL,
         link_type TEXT NOT NULL DEFAULT 'other',
         created_by TEXT NOT NULL DEFAULT 'Architect',
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
       )
+    `);
+
+    await activeDb.execute(sql`
+      ALTER TABLE stage_links ADD COLUMN IF NOT EXISTS document_id TEXT REFERENCES feature_documents(id) ON DELETE CASCADE;
     `);
 
     await activeDb.execute(sql`

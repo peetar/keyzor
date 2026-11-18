@@ -164,6 +164,24 @@ export const featureStages = pgTable("feature_stages", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const featureDocuments = pgTable("feature_documents", {
+  id: text("id").primaryKey(),
+  featureId: text("feature_id")
+    .notNull()
+    .references(() => features.id, { onDelete: "cascade" }),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  filename: text("filename").notNull(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  sizeBytes: integer("size_bytes").notNull().default(0),
+  createdBy: text("created_by").notNull().default("Architect"),
+  updatedBy: text("updated_by").notNull().default("Architect"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const stageLinks = pgTable("stage_links", {
   id: text("id").primaryKey(),
   featureId: text("feature_id")
@@ -171,6 +189,9 @@ export const stageLinks = pgTable("stage_links", {
     .references(() => features.id, { onDelete: "cascade" }),
   stageId: text("stage_id").references(() => featureStages.id, {
     onDelete: "set null",
+  }),
+  documentId: text("document_id").references(() => featureDocuments.id, {
+    onDelete: "cascade",
   }),
   label: text("label").notNull(),
   url: text("url").notNull(),

@@ -84,9 +84,23 @@ function dedupLinks<T extends { url: string }>(links: T[]): T[] {
 
 export function LinkBadge({
   link,
+  shareToken,
 }: {
-  link: { label: string; url: string; linkType: string; createdBy?: string };
+  link: {
+    label: string;
+    url: string;
+    linkType: string;
+    createdBy?: string;
+    isHosted?: boolean;
+  };
+  shareToken?: string;
 }) {
+  const isHosted = link.isHosted || link.url.startsWith("/docs/");
+  const resolvedHref =
+    isHosted && shareToken
+      ? `${link.url}${link.url.includes("?") ? "&" : "?"}shareToken=${encodeURIComponent(shareToken)}`
+      : link.url;
+
   const getIcon = () => {
     switch (link.linkType) {
       case "design_doc":
@@ -104,15 +118,26 @@ export function LinkBadge({
 
   return (
     <a
-      href={link.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-xs text-slate-800 transition group shadow-xs"
-      title={`Added by ${link.createdBy || "Agent"} • ${link.url}`}
+      href={resolvedHref}
+      target={isHosted ? "_self" : "_blank"}
+      rel={isHosted ? undefined : "noopener noreferrer"}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs transition group shadow-xs ${
+        isHosted
+          ? "bg-purple-50 hover:bg-purple-100/80 border-purple-200 text-purple-900"
+          : "bg-slate-100 hover:bg-slate-200/80 border-slate-200 text-slate-800"
+      }`}
+      title={`Added by ${link.createdBy || "Agent"} • ${resolvedHref}`}
     >
       {getIcon()}
       <span className="truncate max-w-[180px] font-medium">{link.label}</span>
-      <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-indigo-600 transition" />
+      {isHosted && (
+        <span className="px-1 py-0.2 rounded bg-purple-200/70 text-[10px] font-semibold text-purple-800">
+          MD
+        </span>
+      )}
+      {!isHosted && (
+        <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-indigo-600 transition" />
+      )}
     </a>
   );
 }

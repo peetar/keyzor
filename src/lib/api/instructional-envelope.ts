@@ -88,18 +88,19 @@ export function buildFeatureGuidance(
         : []),
       {
         when_to_call:
-          "When attaching a design.md link, GitHub PR, Trello card, or updating Who/When without changing stage",
+          "When attaching a design.md link, GitHub PR, Trello card, or updating Who/When without changing stage (or pass 'content' + 'filename' instead of 'url' to host Markdown directly on KEYZOR)",
         method: "PATCH",
         endpoint: `${baseUrl}/api/v1/features/${feature.id}/status`,
         example_body: {
           currentOwner: feature.currentOwner,
           targetDate: feature.targetDate,
           expectedDate: feature.expectedDate,
-          notes: "Updated status & attached link",
+          notes: "Updated status & attached hosted design.md",
           links: [
             {
               label: "Architecture design.md",
-              url: "https://github.com/org/repo/blob/main/design.md",
+              filename: "design.md",
+              content: "# Architecture\n\n...",
               linkType: "design_doc",
             },
           ],
@@ -157,7 +158,11 @@ export function formatFeatureMarkdownForAgent(
   const linksMd =
     feature.links.length > 0
       ? feature.links
-          .map((l) => `- [${l.label}](${l.url}) (${l.linkType})`)
+          .map((l) =>
+            l.isHosted && l.rawUrl
+              ? `- [${l.label}](${l.url}) (${l.linkType}, Hosted Markdown — raw: \`${l.rawUrl}\`)`
+              : `- [${l.label}](${l.url}) (${l.linkType})`
+          )
           .join("\n")
       : "- None attached yet";
 
@@ -428,6 +433,26 @@ curl -X PATCH "${baseUrl}/api/v1/features/<featureSlug>/status" \\
     ],
     "actorName": "Coding Agent"
   }'
+\`\`\`
+
+#### Hosting Text-Only Markdown Files Directly on KEYZOR (Agent-to-Agent Sharing)
+When a \`design.md\`, \`plan.md\`, or \`spec.md\` lives only in your local workspace or a private repo, **do not pass a \`file://\` path**. Instead, pass \`content\` and \`filename\` inside \`links[]\` (max 512 KB per doc, no multipart upload needed):
+- KEYZOR stores the Markdown, generates a hosted viewer URL (\`/docs/doc_...\`), and returns \`rawUrl\` (\`/api/v1/docs/doc_...\`).
+- Re-submitting with the same \`filename\` (or \`label\`) updates the hosted document in place.
+- Other agents can fetch the raw Markdown via \`GET ${baseUrl}/api/v1/docs/<docId>\` using their \`KEYZOR_API_KEY\`.
+
+\`\`\`javascript
+// Example: attach local design.md inline using the Node.js helper below
+await keyzorRequest('PATCH', '/api/v1/features/<featureSlug>/status', {
+  notes: 'Attached hosted design.md for cross-agent review.',
+  links: [{
+    label: 'Architecture design.md',
+    filename: 'design.md',
+    linkType: 'design_doc',
+    content: fs.readFileSync('design.md', 'utf8')
+  }],
+  actorName: 'Coding Agent'
+});
 \`\`\`
 
 ### Completing a Feature (100% Shipped)

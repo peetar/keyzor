@@ -29,5 +29,5 @@ export default async function EncryptedSharePage(context: {
     );
   }
 
-  return <StakeholderShareView project={project} />;
+  return <StakeholderShareView project={project} shareToken={token} />;
 }

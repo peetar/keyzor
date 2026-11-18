@@ -180,6 +180,9 @@ export function KeyzorDashboard({
   const [newLinkLabel, setNewLinkLabel] = useState<string>("");
   const [newLinkUrl, setNewLinkUrl] = useState<string>("");
   const [newLinkType, setNewLinkType] = useState<string>("design_doc");
+  const [newLinkMode, setNewLinkMode] = useState<"url" | "markdown">("url");
+  const [newDocFilename, setNewDocFilename] = useState<string>("design.md");
+  const [newDocContent, setNewDocContent] = useState<string>("");
 
   // New Feature form state
   const [newFeatTitle, setNewFeatTitle] = useState("");
@@ -535,7 +538,19 @@ export function KeyzorDashboard({
     setIsLoading(true);
     try {
       const links =
-        newLinkLabel.trim() && newLinkUrl.trim()
+        newLinkMode === "markdown"
+          ? newDocContent.trim()
+            ? [
+                {
+                  label: newLinkLabel.trim() || newDocFilename.trim() || "design.md",
+                  filename: newDocFilename.trim() || "design.md",
+                  content: newDocContent,
+                  linkType: newLinkType,
+                  stageId: editingStageId || undefined,
+                },
+              ]
+            : undefined
+          : newLinkLabel.trim() && newLinkUrl.trim()
           ? [
               {
                 label: newLinkLabel.trim(),
@@ -564,6 +579,7 @@ export function KeyzorDashboard({
         }),
       });
       setEditingFeature(null);
+      setNewDocContent("");
       await refreshProjects(currentProject?.id);
       router.refresh();
     } finally {
@@ -1992,26 +2008,66 @@ export function KeyzorDashboard({
                 />
               </div>
 
-              {/* Attach Resource Link (design.md, GitHub PR, Trello, Staging URL) */}
+              {/* Attach Resource Link (design.md, GitHub PR, Trello, Staging URL, or Hosted Markdown) */}
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                <div className="text-xs font-mono uppercase text-indigo-600 font-bold">
-                  + Attach Resource Link (design.md, GitHub PR, Staging URL, Trello)
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="text-xs font-mono uppercase text-indigo-600 font-bold">
+                    + Attach Resource Link or Hosted Markdown
+                  </div>
+                  <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-[11px] font-medium">
+                    <button
+                      type="button"
+                      onClick={() => setNewLinkMode("url")}
+                      className={`px-2 py-0.5 rounded-md transition ${
+                        newLinkMode === "url"
+                          ? "bg-indigo-600 text-white"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      External URL
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewLinkMode("markdown")}
+                      className={`px-2 py-0.5 rounded-md transition ${
+                        newLinkMode === "markdown"
+                          ? "bg-purple-600 text-white"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      Host Markdown
+                    </button>
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <input
                     type="text"
                     value={newLinkLabel}
                     onChange={(e) => setNewLinkLabel(e.target.value)}
-                    placeholder="Label (e.g. design.md, PR #42)"
+                    placeholder={
+                      newLinkMode === "markdown"
+                        ? "Label (e.g. Architecture design.md)"
+                        : "Label (e.g. design.md, PR #42)"
+                    }
                     className="bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
-                  <input
-                    type="url"
-                    value={newLinkUrl}
-                    onChange={(e) => setNewLinkUrl(e.target.value)}
-                    placeholder="https://github.com/..."
-                    className="bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
+                  {newLinkMode === "url" ? (
+                    <input
+                      type="url"
+                      value={newLinkUrl}
+                      onChange={(e) => setNewLinkUrl(e.target.value)}
+                      placeholder="https://github.com/..."
+                      className="bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      value={newDocFilename}
+                      onChange={(e) => setNewDocFilename(e.target.value)}
+                      placeholder="Filename (e.g. design.md)"
+                      className="bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  )}
                   <select
                     value={newLinkType}
                     onChange={(e) => setNewLinkType(e.target.value)}
@@ -2024,6 +2080,15 @@ export function KeyzorDashboard({
                     <option value="other">Other Link</option>
                   </select>
                 </div>
+                {newLinkMode === "markdown" && (
+                  <textarea
+                    rows={5}
+                    value={newDocContent}
+                    onChange={(e) => setNewDocContent(e.target.value)}
+                    placeholder="# Architecture Design&#10;&#10;Paste Markdown content here to host it directly on KEYZOR..."
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                )}
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2">

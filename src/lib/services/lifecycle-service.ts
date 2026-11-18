@@ -15,6 +15,29 @@ import {
   hashApiKey,
 } from "@/lib/crypto";
 
+export interface FeatureLinkInput {
+  stageId?: string;
+  label: string;
+  url?: string;
+  linkType?: string;
+  content?: string;
+  filename?: string;
+}
+
+export interface FeatureDocumentRecord {
+  id: string;
+  featureId: string;
+  projectId: string;
+  filename: string;
+  title: string;
+  content: string;
+  sizeBytes: number;
+  createdBy: string;
+  updatedBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface EnrichedStage {
   id: string;
   featureId: string;
@@ -35,6 +58,9 @@ export interface EnrichedStage {
     url: string;
     linkType: string;
     createdBy: string;
+    documentId?: string | null;
+    isHosted?: boolean;
+    rawUrl?: string | null;
   }>;
 }
 
@@ -74,6 +100,9 @@ export interface EnrichedFeature {
     url: string;
     linkType: string;
     createdBy: string;
+    documentId?: string | null;
+    isHosted?: boolean;
+    rawUrl?: string | null;
   }>;
   createdAt: string;
   updatedAt: string;
@@ -936,6 +965,9 @@ export async function getFeatureByIdOrSlug(
         url: l.url,
         linkType: l.linkType,
         createdBy: l.createdBy,
+        documentId: l.documentId || null,
+        isHosted: Boolean(l.documentId),
+        rawUrl: l.documentId ? `/api/v1/docs/${l.documentId}` : null,
       })),
   }));
 
@@ -962,6 +994,9 @@ export async function getFeatureByIdOrSlug(
       url: l.url,
       linkType: l.linkType,
       createdBy: l.createdBy,
+      documentId: l.documentId || null,
+      isHosted: Boolean(l.documentId),
+      rawUrl: l.documentId ? `/api/v1/docs/${l.documentId}` : null,
     })),
     createdAt:
       feature.createdAt instanceof Date
@@ -1075,12 +1110,7 @@ export interface CreateFeatureInput {
     agentInstructions?: string;
     proactiveTrigger?: string;
   }>;
-  links?: Array<{
-    stageId?: string;
-    label: string;
-    url: string;
-    linkType?: string;
-  }>;
+  links?: FeatureLinkInput[];
   actorName?: string;
   actorType?: "agent" | "human";
 }
@@ -1200,26 +1230,13 @@ export async function createFeatureWithFlow(
     await db.insert(schema.featureStages).values(row);
   }
 
-  if (input.links && input.links.length > 0) {
-    const seenUrls = new Set<string>();
-    for (const l of input.links) {
-      if (!l.url || !l.url.trim()) continue;
-      const cleanUrl = l.url.trim();
-      const normKey = normalizeUrl(cleanUrl).toLowerCase();
-      if (seenUrls.has(normKey)) continue;
-      seenUrls.add(normKey);
-
-      await db.insert(schema.stageLinks).values({
-        id: `lnk_${crypto.randomBytes(5).toString("hex")}`,
-        featureId,
-        stageId: l.stageId || currentStageId,
-        label: l.label,
-        url: cleanUrl,
-        linkType: l.linkType || inferLinkType(cleanUrl, l.label),
-        createdBy: input.actorName || "Coding Agent",
-      });
-    }
-  }
+  await upsertFeatureLinks({
+    featureId,
+    projectId: project.id,
+    defaultStageId: currentStageId,
+    links: input.links,
+    actorName: input.actorName || "Coding Agent",
+  });
 
   await db.insert(schema.activityLogs).values({
     id: `act_${crypto.randomBytes(5).toString("hex")}`,
@@ -1273,6 +1290,214 @@ function inferLinkType(url: string, label: string): string {
   return "other";
 }
 
+const MAX_HOSTED_DOC_BYTES = 512 * 1024; // 512 KB
+
+function sanitizeDocFilename(raw: string | undefined, fallbackLabel: string): string {
+  const base = (raw || "").trim() || `${slugify(fallbackLabel) || "document"}.md`;
+  const clean = base.replace(/[/\\]+/g, "_").trim();
+  return clean || "document.md";
+}
+
+export async function getFeatureDocumentById(
+  docId: string
+): Promise<FeatureDocumentRecord | null> {
+  await ensureDatabaseReady();
+  const [doc] = await db
+    .select()
+    .from(schema.featureDocuments)
+    .where(eq(schema.featureDocuments.id, docId))
+    .limit(1);
+
+  if (!doc) return null;
+
+  return {
+    id: doc.id,
+    featureId: doc.featureId,
+    projectId: doc.projectId,
+    filename: doc.filename,
+    title: doc.title,
+    content: doc.content,
+    sizeBytes: doc.sizeBytes,
+    createdBy: doc.createdBy,
+    updatedBy: doc.updatedBy,
+    createdAt:
+      doc.createdAt instanceof Date
+        ? doc.createdAt.toISOString()
+        : String(doc.createdAt),
+    updatedAt:
+      doc.updatedAt instanceof Date
+        ? doc.updatedAt.toISOString()
+        : String(doc.updatedAt),
+  };
+}
+
+async function upsertFeatureLinks(params: {
+  featureId: string;
+  projectId: string;
+  defaultStageId: string | null;
+  links?: FeatureLinkInput[];
+  actorName: string;
+  actionSummaryParts?: string[];
+}): Promise<void> {
+  const { featureId, projectId, defaultStageId, links, actorName, actionSummaryParts } = params;
+  if (!links || links.length === 0) return;
+
+  const existingLinks = await db
+    .select()
+    .from(schema.stageLinks)
+    .where(eq(schema.stageLinks.featureId, featureId));
+
+  const hasHosted = links.some((l) => l.content !== undefined);
+  const existingDocs = hasHosted
+    ? await db
+        .select()
+        .from(schema.featureDocuments)
+        .where(eq(schema.featureDocuments.featureId, featureId))
+    : [];
+
+  const seenUrls = new Set<string>();
+  const seenDocKeys = new Set<string>();
+
+  for (const l of links) {
+    if (l.content !== undefined) {
+      if (typeof l.content !== "string" || !l.content.trim()) {
+        throw new Error(
+          `Hosted markdown link '${l.label || l.filename || "document"}' cannot have empty content.`
+        );
+      }
+      const sizeBytes = Buffer.byteLength(l.content, "utf8");
+      if (sizeBytes > MAX_HOSTED_DOC_BYTES) {
+        throw new Error(
+          `Hosted markdown link '${l.label || l.filename || "document"}' exceeds the 512 KB limit (${sizeBytes} bytes).`
+        );
+      }
+
+      const filename = sanitizeDocFilename(l.filename, l.label || "document");
+      const title = (l.label || filename).trim();
+      const dedupKey = (l.filename ? filename : title).toLowerCase();
+      if (seenDocKeys.has(dedupKey)) continue;
+      seenDocKeys.add(dedupKey);
+
+      const existingDoc = existingDocs.find((d) =>
+        l.filename
+          ? d.filename.toLowerCase() === filename.toLowerCase()
+          : d.title.toLowerCase() === title.toLowerCase()
+      );
+
+      if (existingDoc) {
+        await db
+          .update(schema.featureDocuments)
+          .set({
+            filename,
+            title,
+            content: l.content,
+            sizeBytes,
+            updatedBy: actorName,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.featureDocuments.id, existingDoc.id));
+
+        const hostedUrl = `/docs/${existingDoc.id}`;
+        const existingLink = existingLinks.find(
+          (ex) => ex.documentId === existingDoc.id || areUrlsEquivalent(ex.url, hostedUrl)
+        );
+
+        if (existingLink) {
+          await db
+            .update(schema.stageLinks)
+            .set({
+              stageId: l.stageId || defaultStageId || existingLink.stageId,
+              documentId: existingDoc.id,
+              label: title,
+              url: hostedUrl,
+              linkType: l.linkType || existingLink.linkType || "design_doc",
+              createdBy: actorName,
+            })
+            .where(eq(schema.stageLinks.id, existingLink.id));
+        } else {
+          await db.insert(schema.stageLinks).values({
+            id: `lnk_${crypto.randomBytes(5).toString("hex")}`,
+            featureId,
+            stageId: l.stageId || defaultStageId,
+            documentId: existingDoc.id,
+            label: title,
+            url: hostedUrl,
+            linkType: l.linkType || "design_doc",
+            createdBy: actorName,
+          });
+        }
+
+        actionSummaryParts?.push(`Updated hosted doc '${title}'`);
+      } else {
+        const docId = `doc_${crypto.randomBytes(5).toString("hex")}`;
+        const hostedUrl = `/docs/${docId}`;
+
+        await db.insert(schema.featureDocuments).values({
+          id: docId,
+          featureId,
+          projectId,
+          filename,
+          title,
+          content: l.content,
+          sizeBytes,
+          createdBy: actorName,
+          updatedBy: actorName,
+        });
+
+        await db.insert(schema.stageLinks).values({
+          id: `lnk_${crypto.randomBytes(5).toString("hex")}`,
+          featureId,
+          stageId: l.stageId || defaultStageId,
+          documentId: docId,
+          label: title,
+          url: hostedUrl,
+          linkType: l.linkType || "design_doc",
+          createdBy: actorName,
+        });
+
+        actionSummaryParts?.push(`Hosted doc '${title}'`);
+      }
+      continue;
+    }
+
+    if (!l.url || !l.url.trim()) continue;
+    const cleanUrl = l.url.trim();
+    const normKey = normalizeUrl(cleanUrl).toLowerCase();
+    if (seenUrls.has(normKey)) continue;
+    seenUrls.add(normKey);
+
+    const existingMatch = existingLinks.find((ex) =>
+      areUrlsEquivalent(ex.url, cleanUrl)
+    );
+
+    if (existingMatch) {
+      await db
+        .update(schema.stageLinks)
+        .set({
+          stageId: l.stageId || defaultStageId || existingMatch.stageId,
+          label: l.label || existingMatch.label,
+          linkType:
+            l.linkType ||
+            existingMatch.linkType ||
+            inferLinkType(cleanUrl, l.label || existingMatch.label),
+          createdBy: actorName || existingMatch.createdBy,
+        })
+        .where(eq(schema.stageLinks.id, existingMatch.id));
+    } else {
+      await db.insert(schema.stageLinks).values({
+        id: `lnk_${crypto.randomBytes(5).toString("hex")}`,
+        featureId,
+        stageId: l.stageId || defaultStageId,
+        label: l.label,
+        url: cleanUrl,
+        linkType: l.linkType || inferLinkType(cleanUrl, l.label),
+        createdBy: actorName,
+      });
+      actionSummaryParts?.push(`Attached link '${l.label}'`);
+    }
+  }
+}
+
 export interface UpdateFeatureStatusInput {
   featureIdOrSlug: string;
   // Transition control
@@ -1293,13 +1518,8 @@ export interface UpdateFeatureStatusInput {
   plannedEndDate?: string;
   actualStartDate?: string;
   actualEndDate?: string;
-  // Attach resource links (e.g. design.md, GitHub PR, staging URL, Trello)
-  links?: Array<{
-    label: string;
-    url: string;
-    linkType?: string;
-    stageId?: string;
-  }>;
+  // Attach resource links (e.g. design.md, GitHub PR, staging URL, Trello, or inline markdown)
+  links?: FeatureLinkInput[];
   actorName?: string;
   actorType?: "agent" | "human";
 }
@@ -1465,55 +1685,14 @@ export async function updateFeatureStatus(
     })
     .where(eq(schema.features.id, feature.id));
 
-  if (input.links && input.links.length > 0) {
-    const existingLinks = await db
-      .select()
-      .from(schema.stageLinks)
-      .where(eq(schema.stageLinks.featureId, feature.id));
-
-    const seenUrls = new Set<string>();
-
-    for (const l of input.links) {
-      if (!l.url || !l.url.trim()) continue;
-      const cleanUrl = l.url.trim();
-      const normKey = normalizeUrl(cleanUrl).toLowerCase();
-
-      // Avoid duplicates within the input.links payload itself
-      if (seenUrls.has(normKey)) continue;
-      seenUrls.add(normKey);
-
-      const existingMatch = existingLinks.find((ex) =>
-        areUrlsEquivalent(ex.url, cleanUrl)
-      );
-
-      if (existingMatch) {
-        // Update existing link instead of inserting duplicate
-        await db
-          .update(schema.stageLinks)
-          .set({
-            stageId: l.stageId || targetStage?.id || existingMatch.stageId,
-            label: l.label || existingMatch.label,
-            linkType:
-              l.linkType ||
-              existingMatch.linkType ||
-              inferLinkType(cleanUrl, l.label || existingMatch.label),
-            createdBy: input.actorName || existingMatch.createdBy,
-          })
-          .where(eq(schema.stageLinks.id, existingMatch.id));
-      } else {
-        await db.insert(schema.stageLinks).values({
-          id: `lnk_${crypto.randomBytes(5).toString("hex")}`,
-          featureId: feature.id,
-          stageId: l.stageId || targetStage?.id || feature.currentStageId,
-          label: l.label,
-          url: cleanUrl,
-          linkType: l.linkType || inferLinkType(cleanUrl, l.label),
-          createdBy: input.actorName || "Coding Agent",
-        });
-        actionSummaryParts.push(`Attached link '${l.label}'`);
-      }
-    }
-  }
+  await upsertFeatureLinks({
+    featureId: feature.id,
+    projectId: feature.projectId,
+    defaultStageId: targetStage?.id || feature.currentStageId,
+    links: input.links,
+    actorName: input.actorName || "Coding Agent",
+    actionSummaryParts,
+  });
 
   if (input.notes) {
     actionSummaryParts.push(`Note: "${input.notes}"`);

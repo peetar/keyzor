@@ -36,7 +36,7 @@ Follow these 5 specific operational triggers:
 1. **Design / Plan / Spec Handoff Trigger (CRITICAL)**:
    - **When**: Whenever you or the user create, edit, or finalize any design doc, architecture specification, RFC, or implementation plan (e.g., `design.md`, `architecture.md`, `plan.md`, `implementation_plan.md`, `spec.md`, OpenAPI contract).
    - **Action**: Proactively ask:
-     > *"I see we just created/updated `[filename]`. Would you like me to attach this design doc link to KEYZOR and advance the flowchart to 'Architecture & design.md' (or 'Handed Over to Dev')?"*
+     > *"I see we just created/updated `[filename]`. Would you like me to attach this design doc to KEYZOR (hosted directly on KEYZOR if it's local/private) and advance the flowchart to 'Architecture & design.md' (or 'Handed Over to Dev')?"*
 
 2. **Git Push & Deployment Completion Hook (CRITICAL)**:
    - **When**: Before or immediately after executing `git push`, opening a PR (`gh pr create`), or running a deployment command (`vercel --prod`, `npm run deploy`, Docker release).
@@ -178,6 +178,32 @@ curl -X PATCH "https://keyzor.vercel.app/api/v1/features/<featureSlug>/status" \
   }'
 ```
 
+### Hosting Text-Only Markdown Files Directly on KEYZOR (Agent-to-Agent Sharing)
+When a `design.md`, `plan.md`, or `spec.md` lives only in your local workspace or a private repo, **never pass a `file://` path**. Instead, attach the Markdown inline inside `links[]` using `content` and `filename` (max **512 KB** per doc, no `multipart/form-data` needed):
+
+- **Attach / Idempotent Update:** Pass `filename` + `content` (without `url`). KEYZOR stores the Markdown, generates a viewer URL (`/docs/doc_...`), and returns `isHosted: true` and `rawUrl: "/api/v1/docs/doc_..."`. Re-submitting with the same `filename` (or `label`) updates the hosted document in place without creating duplicates.
+- **Cross-Agent Fetch:** Any agent with access to the project can fetch another agent's hosted doc via `GET https://keyzor.vercel.app/api/v1/docs/<docId>` (returns `text/markdown; charset=utf-8` by default, or JSON with `?format=json`).
+- **Windows / PowerShell Rule:** Never paste multi-line Markdown into inline `curl -d '...'`. Always use the Node.js helper below with `fs.readFileSync(...)`.
+
+```javascript
+// Attach (or update) a local Markdown file on a KEYZOR feature
+await keyzorRequest('PATCH', '/api/v1/features/<featureSlug>/status', {
+  notes: 'Hosted architecture design.md directly on KEYZOR for cross-agent sharing.',
+  links: [
+    {
+      label: 'Architecture design.md',
+      filename: 'design.md',
+      linkType: 'design_doc',
+      content: fs.readFileSync('design.md', 'utf8')
+    }
+  ],
+  actorName: 'Coding Agent'
+});
+
+// Fetch a hosted Markdown doc created by another agent (raw text/markdown)
+const rawMarkdown = await keyzorRequest('GET', '/api/v1/docs/<docId>');
+```
+
 ### Completing a Feature (100% Shipped)
 To advance a feature to the final stage and mark it 100% complete:
 
@@ -202,7 +228,7 @@ curl -X PATCH "https://keyzor.vercel.app/api/v1/features/<featureSlug>/status" \
 ```
 
 ### E. Zero-Dependency Node.js Helper (PowerShell & Windows Safe, Reads `.env.local`)
-Inline `curl` with complex JSON payloads often encounters quoting and escaping issues in PowerShell and Windows shells. Use this cross-platform Node.js snippet, which automatically loads `KEYZOR_API_KEY` from `.env.local`:
+Inline `curl` with complex JSON payloads often encounters quoting and escaping issues in PowerShell and Windows shells. Use this cross-platform Node.js snippet, which automatically loads `KEYZOR_API_KEY` from `.env.local` and handles both JSON and `text/markdown` responses:
 
 ```javascript
 // Quick Keyzor API Helper (zero dependencies, reads KEYZOR_API_KEY from .env.local)
@@ -223,19 +249,23 @@ function getKeyzorApiKey() {
 function keyzorRequest(method, path, body, apiKey = getKeyzorApiKey()) {
   return new Promise((resolve, reject) => {
     const payload = body ? JSON.stringify(body) : '';
+    const headers = { Authorization: `Bearer ${apiKey}` };
+    if (payload) {
+      headers['Content-Type'] = 'application/json';
+      headers['Content-Length'] = Buffer.byteLength(payload);
+    }
     const req = https.request({
       hostname: 'keyzor.vercel.app',
       path,
       method,
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(payload)
-      }
+      headers
     }, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
-      res.on('end', () => resolve(JSON.parse(data)));
+      res.on('end', () => {
+        const contentType = res.headers['content-type'] || '';
+        resolve(contentType.includes('application/json') ? JSON.parse(data) : data);
+      });
     });
     req.on('error', reject);
     if (payload) req.write(payload);
