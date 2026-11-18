@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOutAction } from "@/app/actions/auth-actions";
@@ -253,6 +253,29 @@ export function KeyzorDashboard({
             f.slug.toLowerCase() === focusedFeatureId.toLowerCase()
         ) || null
       : null;
+
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const [tableOverflowWidth, setTableOverflowWidth] = useState<number>(0);
+
+  useEffect(() => {
+    const el = tableScrollRef.current;
+    if (!el) {
+      setTableOverflowWidth(0);
+      return;
+    }
+    const updateWidth = () => {
+      setTableOverflowWidth(el.scrollWidth > el.clientWidth + 1 ? el.scrollWidth : 0);
+    };
+    updateWidth();
+    const ro = new ResizeObserver(updateWidth);
+    ro.observe(el);
+    window.addEventListener("resize", updateWidth);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", updateWidth);
+    };
+  });
 
   const displayFeatures =
     mode === "feature" && focusedFeature
@@ -1520,147 +1543,190 @@ export function KeyzorDashboard({
                     </button>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-sm">
-                      <thead>
-                        <tr className="border-b border-slate-200 text-[11px] font-mono uppercase text-slate-600 bg-slate-50 font-semibold select-none">
-                          <th
-                            className="py-2.5 px-4 cursor-pointer hover:text-indigo-600 transition"
-                            onClick={() => handleSortChange("title")}
-                          >
-                            <div className="flex items-center gap-1">
-                              <span>Feature</span>
-                              {sortBy === "title" ? (
-                                sortOrder === "asc" ? <ChevronUp className="w-3 h-3 text-indigo-600" /> : <ChevronDown className="w-3 h-3 text-indigo-600" />
-                              ) : (
-                                <ChevronsUpDown className="w-3 h-3 text-slate-300" />
-                              )}
-                            </div>
-                          </th>
-                          <th
-                            className="py-2.5 px-4 cursor-pointer hover:text-indigo-600 transition"
-                            onClick={() => handleSortChange("stage")}
-                          >
-                            <div className="flex items-center gap-1">
-                              <span>Stage</span>
-                              {sortBy === "stage" ? (
-                                sortOrder === "asc" ? <ChevronUp className="w-3 h-3 text-indigo-600" /> : <ChevronDown className="w-3 h-3 text-indigo-600" />
-                              ) : (
-                                <ChevronsUpDown className="w-3 h-3 text-slate-300" />
-                              )}
-                            </div>
-                          </th>
-                          <th
-                            className="py-2.5 px-4 min-w-[160px] cursor-pointer hover:text-indigo-600 transition"
-                            onClick={() => handleSortChange("owner")}
-                          >
-                            <div className="flex items-center gap-1">
-                              <span>Current Owner</span>
-                              {sortBy === "owner" ? (
-                                sortOrder === "asc" ? <ChevronUp className="w-3 h-3 text-indigo-600" /> : <ChevronDown className="w-3 h-3 text-indigo-600" />
-                              ) : (
-                                <ChevronsUpDown className="w-3 h-3 text-slate-300" />
-                              )}
-                            </div>
-                          </th>
-                          <th
-                            className="py-2.5 px-4 cursor-pointer hover:text-indigo-600 transition"
-                            onClick={() => handleSortChange("timeline")}
-                          >
-                            <div className="flex items-center gap-1">
-                              <span>Timeline</span>
-                              {sortBy === "timeline" ? (
-                                sortOrder === "asc" ? <ChevronUp className="w-3 h-3 text-indigo-600" /> : <ChevronDown className="w-3 h-3 text-indigo-600" />
-                              ) : (
-                                <ChevronsUpDown className="w-3 h-3 text-slate-300" />
-                              )}
-                            </div>
-                          </th>
-                          <th className="py-2.5 px-4">Key Links</th>
-                          <th className="py-2.5 px-4 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200/80">
-                        {filteredFeatures.map((feat) => (
-                          <tr
-                            key={feat.id}
-                            onClick={() => {
-                              if (mode === "project") {
-                                router.push(`/${effectiveCreatorSlug}/${currentProject.slug}/${feat.slug}`);
-                              } else {
-                                const el = document.getElementById(`feature-card-${feat.id}`);
-                                if (el) {
-                                  el.scrollIntoView({ behavior: "smooth", block: "start" });
-                                }
-                              }
-                            }}
-                            className={`${mode === "project" ? "hover:bg-slate-50/80 cursor-pointer" : ""} transition group`}
-                          >
-                            <td className="py-3 px-4 font-bold text-slate-900">
-                              <div className="group-hover:text-indigo-600 transition-colors">
-                                {feat.title}
-                              </div>
-                              <div className="text-xs text-slate-500 font-normal truncate max-w-xs">
-                                {feat.summary}
-                              </div>
-                            </td>
-                            {/* Neutral Stage Pill with Semantic Progress Dot (Item 1.6) */}
-                            <td className="py-3 px-4">
-                              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold">
-                                <span
-                                  className={`w-2 h-2 rounded-full ${getStageProgressDotClass(
-                                    feat.fourQuestions.where.stageIndex,
-                                    feat.fourQuestions.where.totalStages
-                                  )} shrink-0`}
-                                />
-                                <span className="whitespace-nowrap">{feat.fourQuestions.where.stageName}</span>
-                                <span className="text-slate-500 font-mono text-[11px] whitespace-nowrap">
-                                  (Stage {feat.fourQuestions.where.stageIndex + 1}/
-                                  {feat.fourQuestions.where.totalStages})
-                                </span>
-                              </div>
-                            </td>
-                            {/* Owner Column Sizing & Truncation with Tooltip (Item 1.5) */}
-                            <td className="py-3 px-4 text-xs text-slate-700 font-medium min-w-[160px] max-w-[220px]">
-                              <div
-                                className="line-clamp-2 sm:line-clamp-3 leading-snug cursor-help"
-                                title={feat.fourQuestions.who}
-                              >
-                                {feat.fourQuestions.who}
-                              </div>
-                            </td>
-                            {/* Consolidated Timeline Column (Items 1.2 & 1.4: eliminates horizontal scroll) */}
-                            <td className="py-3 px-4">
-                              <div
-                                className="flex items-center gap-2 whitespace-nowrap cursor-help"
-                                title={`Projected: ${formatDisplayDate(feat.fourQuestions.whenExpectDone)}${
-                                  feat.fourQuestions.whenWantDone
-                                    ? ` • Target Deadline: ${formatDisplayDate(feat.fourQuestions.whenWantDone)}`
-                                    : ""
-                                }`}
-                              >
-                                <span className="font-mono text-xs text-slate-900 font-bold shrink-0">
-                                  {formatDisplayDate(feat.fourQuestions.whenExpectDone)}
-                                </span>
-                                <ScheduleHealthBadge feature={feat} />
-                              </div>
-                              {feat.fourQuestions.whenWantDone && (
-                                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                                  Target: {formatDisplayDate(feat.fourQuestions.whenWantDone)}
-                                </div>
-                              )}
-                            </td>
-                            <td
-                              className="py-3 px-4"
-                              onClick={(e) => e.stopPropagation()}
+                  <div>
+                    {tableOverflowWidth > 0 && (
+                      <div
+                        ref={topScrollRef}
+                        onScroll={() => {
+                          if (tableScrollRef.current && topScrollRef.current) {
+                            tableScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+                          }
+                        }}
+                        className="overflow-x-auto border-b border-slate-200/80 bg-slate-50/70"
+                      >
+                        <div style={{ width: tableOverflowWidth, height: 10 }} />
+                      </div>
+                    )}
+                    <div
+                      ref={tableScrollRef}
+                      onScroll={() => {
+                        if (topScrollRef.current && tableScrollRef.current) {
+                          topScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
+                        }
+                      }}
+                      className="overflow-x-auto"
+                    >
+                      <table className="w-full text-left border-collapse text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-200 text-[11px] font-mono uppercase text-slate-600 bg-slate-50 font-semibold select-none">
+                            <th
+                              className="py-2.5 px-3 cursor-pointer hover:text-indigo-600 transition"
+                              onClick={() => handleSortChange("title")}
                             >
-                              <div className="flex flex-wrap gap-1.5">
-                                {dedupLinks(feat.links).slice(0, 2).map((l) => (
-                                  <LinkBadge key={l.id} link={l} />
-                                ))}
-                                {dedupLinks(feat.links).length === 0 && (
-                                  <span className="text-xs text-slate-400">None</span>
+                              <div className="flex items-center gap-1">
+                                <span>Feature</span>
+                                {sortBy === "title" ? (
+                                  sortOrder === "asc" ? <ChevronUp className="w-3 h-3 text-indigo-600" /> : <ChevronDown className="w-3 h-3 text-indigo-600" />
+                                ) : (
+                                  <ChevronsUpDown className="w-3 h-3 text-slate-300" />
                                 )}
+                              </div>
+                            </th>
+                            <th
+                              className="py-2.5 px-3 cursor-pointer hover:text-indigo-600 transition"
+                              onClick={() => handleSortChange("stage")}
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>Stage</span>
+                                {sortBy === "stage" ? (
+                                  sortOrder === "asc" ? <ChevronUp className="w-3 h-3 text-indigo-600" /> : <ChevronDown className="w-3 h-3 text-indigo-600" />
+                                ) : (
+                                  <ChevronsUpDown className="w-3 h-3 text-slate-300" />
+                                )}
+                              </div>
+                            </th>
+                            <th
+                              className="py-2.5 px-3 min-w-[110px] cursor-pointer hover:text-indigo-600 transition"
+                              onClick={() => handleSortChange("owner")}
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>Owner</span>
+                                {sortBy === "owner" ? (
+                                  sortOrder === "asc" ? <ChevronUp className="w-3 h-3 text-indigo-600" /> : <ChevronDown className="w-3 h-3 text-indigo-600" />
+                                ) : (
+                                  <ChevronsUpDown className="w-3 h-3 text-slate-300" />
+                                )}
+                              </div>
+                            </th>
+                            <th
+                              className="py-2.5 px-3 cursor-pointer hover:text-indigo-600 transition"
+                              onClick={() => handleSortChange("timeline")}
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>Timeline</span>
+                                {sortBy === "timeline" ? (
+                                  sortOrder === "asc" ? <ChevronUp className="w-3 h-3 text-indigo-600" /> : <ChevronDown className="w-3 h-3 text-indigo-600" />
+                                ) : (
+                                  <ChevronsUpDown className="w-3 h-3 text-slate-300" />
+                                )}
+                              </div>
+                            </th>
+                            <th className="py-2.5 px-3">Key Links</th>
+                            <th className="py-2.5 px-3 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200/80">
+                          {filteredFeatures.map((feat) => (
+                            <tr
+                              key={feat.id}
+                              onClick={() => {
+                                if (mode === "project") {
+                                  router.push(`/${effectiveCreatorSlug}/${currentProject.slug}/${feat.slug}`);
+                                } else {
+                                  const el = document.getElementById(`feature-card-${feat.id}`);
+                                  if (el) {
+                                    el.scrollIntoView({ behavior: "smooth", block: "start" });
+                                  }
+                                }
+                              }}
+                              className={`${mode === "project" ? "hover:bg-slate-50/80 cursor-pointer" : ""} transition group`}
+                            >
+                              <td className="py-3 px-3 font-bold text-slate-900 max-w-[240px]">
+                                <div className="group-hover:text-indigo-600 transition-colors line-clamp-2 leading-snug">
+                                  {feat.title}
+                                </div>
+                                <div className="text-xs text-slate-500 font-normal truncate max-w-[220px] mt-0.5">
+                                  {feat.summary}
+                                </div>
+                              </td>
+                              {/* Compact Wrappable Stage Pill with Semantic Progress Dot */}
+                              <td className="py-3 px-3">
+                                <div className="inline-flex items-start gap-1.5 px-2 py-1 rounded-md bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold max-w-[175px]">
+                                  <span
+                                    className={`w-2 h-2 rounded-full mt-1 ${getStageProgressDotClass(
+                                      feat.fourQuestions.where.stageIndex,
+                                      feat.fourQuestions.where.totalStages
+                                    )} shrink-0`}
+                                  />
+                                  <span className="leading-snug">
+                                    {feat.fourQuestions.where.stageName}{" "}
+                                    <span className="text-slate-500 font-mono text-[11px] whitespace-nowrap">
+                                      ({feat.fourQuestions.where.stageIndex + 1}/
+                                      {feat.fourQuestions.where.totalStages})
+                                    </span>
+                                  </span>
+                                </div>
+                              </td>
+                              {/* Owner Column Sizing & Truncation with Tooltip */}
+                              <td className="py-3 px-3 text-xs text-slate-700 font-medium min-w-[110px] max-w-[170px]">
+                                <div
+                                  className="line-clamp-2 sm:line-clamp-3 leading-snug cursor-help"
+                                  title={feat.fourQuestions.who}
+                                >
+                                  {feat.fourQuestions.who}
+                                </div>
+                              </td>
+                              {/* Consolidated Timeline Column */}
+                              <td className="py-3 px-3">
+                                <div
+                                  className="flex flex-wrap items-center gap-1.5 cursor-help"
+                                  title={`Projected: ${formatDisplayDate(feat.fourQuestions.whenExpectDone)}${
+                                    feat.fourQuestions.whenWantDone
+                                      ? ` • Target Deadline: ${formatDisplayDate(feat.fourQuestions.whenWantDone)}`
+                                      : ""
+                                  }`}
+                                >
+                                  <span className="font-mono text-xs text-slate-900 font-bold shrink-0">
+                                    {formatDisplayDate(feat.fourQuestions.whenExpectDone)}
+                                  </span>
+                                  <ScheduleHealthBadge feature={feat} />
+                                </div>
+                                {feat.fourQuestions.whenWantDone && (
+                                  <div className="text-[10px] text-slate-400 font-mono mt-0.5 whitespace-nowrap">
+                                    Target: {formatDisplayDate(feat.fourQuestions.whenWantDone)}
+                                  </div>
+                                )}
+                              </td>
+                              <td
+                                className="py-3 px-3"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {(() => {
+                                  const allLinks = dedupLinks(feat.links);
+                                  const sorted = [...allLinks].sort((a, b) => {
+                                    const aH = a.isHosted || a.url.startsWith("/docs/") ? 0 : 1;
+                                    const bH = b.isHosted || b.url.startsWith("/docs/") ? 0 : 1;
+                                    return aH - bH;
+                                  });
+                                  const visible = sorted.slice(0, 2);
+                                  const remaining = sorted.length - visible.length;
+                                  return (
+                                    <>
+                                      {visible.map((l) => (
+                                        <LinkBadge key={l.id} link={l} />
+                                      ))}
+                                      {remaining > 0 && (
+                                        <span className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-[11px] font-medium text-slate-500">
+                                          +{remaining} more
+                                        </span>
+                                      )}
+                                      {allLinks.length === 0 && (
+                                        <span className="text-xs text-slate-400">None</span>
+                                      )}
+                                    </>
+                                  );
+                                })()}
                               </div>
                             </td>
                             <td
@@ -1681,6 +1747,7 @@ export function KeyzorDashboard({
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 )}
               </div>
